@@ -25,11 +25,14 @@ curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-
 Abra o **PowerShell** e rode:
 
 ```powershell
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.1/install.ps1 | iex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.1/install.ps1)))
 ```
 
 O instalador exibe um aviso, pede confirmação e abre um menu de tiers — tudo interativo.
 Ao terminar, abra um PowerShell **novo** e use `claude`.
+
+> **Por que não `irm | iex`?** Scripts com bloco `param()` falham com `| iex` no PowerShell.
+> O `& ([scriptblock]::Create(...))` é o equivalente correto.
 
 > Instala o **Claude Code nativo** (sem WSL, sem Node, com auto-atualização) e as demais
 > ferramentas via **winget**, e ajusta o perfil do PowerShell.
