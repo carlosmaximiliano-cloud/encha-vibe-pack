@@ -32,7 +32,8 @@ param(
   [ValidateSet('', 'rapido', 'recomendado', 'completo')]
   [string]$Preset = '',
   [string]$Distro = 'Ubuntu',
-  [switch]$AllowUnverified
+  [switch]$AllowUnverified,
+  [switch]$AcceptRisk
 )
 
 $ErrorActionPreference = 'Stop'
@@ -67,6 +68,31 @@ function Assert-Inputs {
   }
 }
 
+# --- Aviso de isenção de responsabilidade ---
+function Show-Disclaimer {
+  Write-Host ''
+  Write-Host '  Aviso importante' -ForegroundColor Yellow
+  Write-Host '  O Encha Vibe Pack e um instalador GRATUITO, em versao BETA e fornecido' -ForegroundColor White
+  Write-Host '  SEM QUALQUER GARANTIA (veja a LICENSE/MIT). Ele habilita o WSL2 e instala' -ForegroundColor White
+  Write-Host '  o Ubuntu (pode exigir reinicio), depois instala pacotes e altera config de' -ForegroundColor White
+  Write-Host '  shell dentro do Linux. Ao prosseguir, voce assume os riscos e a' -ForegroundColor White
+  Write-Host '  responsabilidade pelo uso.' -ForegroundColor White
+  Write-Host ''
+}
+
+# Garante o aceite do aviso. Aceita via -AcceptRisk, env ENCHA_ACCEPT_RISK=1,
+# -Preset (análogo ao --yes) ou resposta interativa (default = Não).
+function Confirm-Risk {
+  Show-Disclaimer
+  if ($AcceptRisk -or ($env:ENCHA_ACCEPT_RISK -eq '1') -or $Preset) { return }
+  $ans = Read-Host 'Voce concorda em prosseguir, por sua conta e risco? [s/N]'
+  if ($ans -notmatch '^(s|sim|y|yes)$') {
+    Write-ErrMsg 'E preciso aceitar os termos para continuar.'
+    Write-Host   'Para automatizar, defina $env:ENCHA_ACCEPT_RISK=1 ou passe -AcceptRisk.' -ForegroundColor White
+    exit 1
+  }
+}
+
 function Test-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
   $p  = New-Object Security.Principal.WindowsPrincipal($id)
@@ -88,6 +114,8 @@ function Invoke-Elevation {
   $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Distro', $Distro)
   if ($Preset)          { $argList += @('-Preset', $Preset) }
   if ($AllowUnverified) { $argList += '-AllowUnverified' }
+  # O aviso já foi aceito antes da elevação — não pergunta de novo na janela elevada.
+  $argList += '-AcceptRisk'
   try {
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argList
   } catch {
@@ -194,8 +222,9 @@ function Step-RunInstaller {
     Write-WarnMsg 'Não consegui garantir o curl no Ubuntu (seguindo mesmo assim).'
   }
 
-  $envPrefix = ''
-  if ($AllowUnverified) { $envPrefix = 'ENCHA_ALLOW_UNVERIFIED=1 ' }
+  # O aviso já foi aceito do lado do Windows — propaga para o run.sh não repetir.
+  $envPrefix = 'ENCHA_ACCEPT_RISK=1 '
+  if ($AllowUnverified) { $envPrefix += 'ENCHA_ALLOW_UNVERIFIED=1 ' }
   $bashArgs = ''
   if ($Preset) { $bashArgs = " -- --preset $Preset" }
 
@@ -218,6 +247,8 @@ Assert-Inputs
 Write-Host ''
 Write-Host '  Encha Vibe Pack — bootstrap para Windows (via WSL2)' -ForegroundColor Cyan
 Write-Host "  repo: $Repo  -  ref: $Ref" -ForegroundColor DarkGray
+
+Confirm-Risk
 
 if (-not (Step-InstallWsl)) {
   Write-WarnMsg 'Etapa do WSL ainda não concluída. Reinicie/abra o Ubuntu conforme indicado e rode novamente.'

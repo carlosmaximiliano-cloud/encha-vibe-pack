@@ -37,11 +37,15 @@ Uso: run.sh [opções]
 
 Opções:
   --preset <nome>   Instala um preset sem menu: rapido | recomendado | completo
-  --yes, -y         Não pergunta confirmações (modo não-interativo)
+  --yes, -y         Não pergunta confirmações (modo não-interativo; também aceita o aviso)
+  --accept-risk     Aceita o aviso de isenção de responsabilidade sem perguntar
   --dry-run         Mostra o que faria, sem instalar nada
   --list            Lista os módulos disponíveis e sai
   --no-color        Desativa cores
   -h, --help        Mostra esta ajuda
+
+Variáveis de ambiente:
+  ENCHA_ACCEPT_RISK=1   Aceita o aviso (útil para automação sem terminal)
 EOF
 }
 
@@ -55,16 +59,18 @@ list_modules() {
 # --- Parsing de argumentos ---
 PRESET=""
 DO_LIST=0
+ACCEPT_RISK="${ACCEPT_RISK:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --preset)    PRESET="${2:-}"; shift 2 ;;
-    --preset=*)  PRESET="${1#*=}"; shift ;;
-    --yes|-y)    ASSUME_YES=1; shift ;;
-    --dry-run)   DRY_RUN=1; shift ;;
-    --no-color)  NO_COLOR=1; shift ;;
-    --list)      DO_LIST=1; shift ;;
-    -h|--help)   usage; exit 0 ;;
-    *)           log_warn "argumento ignorado: $1"; shift ;;
+    --preset)      PRESET="${2:-}"; shift 2 ;;
+    --preset=*)    PRESET="${1#*=}"; shift ;;
+    --yes|-y)      ASSUME_YES=1; shift ;;
+    --accept-risk) ACCEPT_RISK=1; shift ;;
+    --dry-run)     DRY_RUN=1; shift ;;
+    --no-color)    NO_COLOR=1; shift ;;
+    --list)        DO_LIST=1; shift ;;
+    -h|--help)     usage; exit 0 ;;
+    *)             log_warn "argumento ignorado: $1"; shift ;;
   esac
 done
 export ASSUME_YES DRY_RUN
@@ -88,6 +94,16 @@ setup_error_trap
 detect_all
 
 print_banner "$VERSION" "$(os_label)"
+
+# --- Aviso de isenção de responsabilidade (sempre exibido) ---
+# Aceite via: ENCHA_ACCEPT_RISK=1, --accept-risk, --yes (ASSUME_YES) ou "s" no prompt.
+print_disclaimer
+if [ "${ENCHA_ACCEPT_RISK:-0}" != "1" ] && [ "${ACCEPT_RISK:-0}" != "1" ]; then
+  if ! confirm "Você concorda em prosseguir, por sua conta e risco?"; then
+    die "É preciso aceitar os termos para continuar.
+   Para automatizar (sem terminal), defina ENCHA_ACCEPT_RISK=1."
+  fi
+fi
 
 case "${ENCHA_OS:-unknown}" in
   macos|linux|wsl) : ;;

@@ -76,6 +76,21 @@ print_banner() {
   } >&2
 }
 
+# Aviso de isenção de responsabilidade. UI pura (sem prompt): apenas imprime o
+# texto em stderr. A decisão de aceite fica a cargo do chamador (run.sh).
+print_disclaimer() {
+  {
+    printf '%s%s  Aviso importante%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET"
+    printf '  O Encha Vibe Pack é um instalador %sgratuito%s, em %sversão beta%s e fornecido\n' \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    printf '  %sSEM QUALQUER GARANTIA%s (veja a LICENSE/MIT). Ele instala pacotes e altera\n' \
+      "$C_BOLD" "$C_RESET"
+    printf '  configurações do seu shell (ex.: ~/.zshrc, ~/.bashrc). No Windows, habilita\n'
+    printf '  o WSL2 e instala o Ubuntu, podendo exigir reinício.\n'
+    printf '  Ao prosseguir, você assume os riscos e a responsabilidade pelo uso.\n\n'
+  } >&2
+}
+
 # Lê um preset (presets/<nome>.txt) e imprime os módulos válidos (um por linha).
 # Ignora linhas em branco e comentários (#).
 load_preset() {

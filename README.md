@@ -69,16 +69,25 @@ Para detalhes sobre cada ferramenta — o que faz, para quem serve e o que você
 
 ```
 --preset <nome>   Instala um preset sem menu: rapido | recomendado | completo
---yes, -y         Não pergunta confirmações (modo não-interativo)
+--yes, -y         Não pergunta confirmações (modo não-interativo; também aceita o aviso)
+--accept-risk     Aceita o aviso de isenção de responsabilidade sem perguntar
 --dry-run         Mostra o que faria, sem instalar nada
 --list            Lista os módulos disponíveis e sai
 --no-color        Desativa cores
 -h, --help        Ajuda
 ```
 
+> Variável de ambiente `ENCHA_ACCEPT_RISK=1` aceita o aviso de isenção em automações
+> sem terminal (equivalente a `--accept-risk`).
+
 ---
 
 ## 🔒 Segurança
+
+> **Gratuito, beta e sem garantia.** O Encha Vibe Pack é um projeto gratuito, em
+> versão beta, fornecido **sem qualquer garantia** (licença MIT). Na primeira tela o
+> instalador exibe um **aviso de isenção** e pede que você **concorde em prosseguir por
+> sua conta e risco** antes de qualquer instalação.
 
 Levamos a sério rodar coisas na máquina do aluno:
 
