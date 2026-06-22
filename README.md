@@ -61,6 +61,8 @@ curl -fsSL .../install.sh | bash -s -- --preset rapido --yes
 
 > No **WSL**, o VS Code e as fontes ficam do lado do **Windows** — o instalador avisa e orienta.
 
+Para detalhes sobre cada ferramenta — o que faz, para quem serve e o que você perde sem ela — veja o [Guia completo das ferramentas](docs/ferramentas.md).
+
 ---
 
 ## ⚙️ Opções da linha de comando
