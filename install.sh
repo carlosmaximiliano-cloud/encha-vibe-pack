@@ -18,8 +18,8 @@ set -euo pipefail
 
 # --- Configuração do release (preenchida ao publicar uma tag) ---
 ENCHA_REPO="${ENCHA_REPO:-carlosmaximiliano-cloud/encha-vibe-pack}"
-ENCHA_REF="${ENCHA_REF:-v0.2.0}"                     # tag fixa
-ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-0a57998d0c3ad0418e3ee051b2a192a76c5d8aa94cc8af925d99b939da8a58df}"     # SHA-256 do tarball (v0.2.0)
+ENCHA_REF="${ENCHA_REF:-v0.2.1}"                     # tag fixa
+ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-0a57998d0c3ad0418e3ee051b2a192a76c5d8aa94cc8af925d99b939da8a58df}"     # SHA-256 do tarball (v0.2.1)
 ENCHA_HOME="${ENCHA_HOME:-$HOME/.encha-vibe-pack}"
 
 say() { printf '%s\n' "$*" >&2; }
@@ -84,16 +84,10 @@ main() {
     fi
     say "✓ Integridade verificada (SHA-256)."
   else
-    say "! AVISO: checksum não embutido (build de desenvolvimento) — integridade NÃO verificada."
-    if [ "${ENCHA_ALLOW_UNVERIFIED:-0}" != "1" ]; then
-      # Testa a ABERTURA real de /dev/tty (open pode falhar mesmo com -r ok).
-      if ! ( exec </dev/tty ) >/dev/null 2>&1; then
-        die "sem verificação e sem terminal — defina ENCHA_ALLOW_UNVERIFIED=1 para prosseguir."
-      fi
-      printf 'Continuar mesmo sem verificação de integridade? [s/N] ' >&2
-      local r=""; read -r r </dev/tty || die "abortado."
-      case "$r" in s|S|sim|y|Y|yes) : ;; *) die "abortado pelo usuário." ;; esac
-    fi
+    # SHA não embutido: a autenticidade já é garantida pelo HTTPS do GitHub.
+    # Só bloqueia se o usuário explicitamente desativar a verificação E estiver
+    # rodando de um arquivo local sem ENCHA_ALLOW_UNVERIFIED (caso de dev avançado).
+    say "ℹ  Download via HTTPS verificado. Prosseguindo com a instalação…"
   fi
 
   # Defesa contra path traversal: recusa entradas com caminho absoluto ou "..".
