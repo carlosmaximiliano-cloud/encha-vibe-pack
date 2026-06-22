@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Bootstrap do Encha Vibe Pack no Windows.
@@ -47,6 +47,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Garante saída UTF-8 no console (acentos corretos mesmo no Windows PowerShell 5.1).
+try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false) } catch {}
 # Faz o wsl.exe emitir UTF-8 (em vez de UTF-16LE), evitando lixo no parsing.
 $env:WSL_UTF8 = '1'
 
@@ -119,6 +121,12 @@ function Confirm-Risk {
   param([switch]$Wsl)
   Show-Disclaimer -Wsl:$Wsl
   if ($AcceptRisk -or ($env:ENCHA_ACCEPT_RISK -eq '1') -or $Preset) { return }
+  if (-not (Test-Interactive)) {
+    Write-ErrMsg 'Sem terminal interativo para confirmar o aviso.'
+    Write-Host   'Rode de novo aceitando os termos, ex.: .\install.ps1 -AcceptRisk -Preset rapido' -ForegroundColor White
+    Write-Host   '(ou defina $env:ENCHA_ACCEPT_RISK=1).' -ForegroundColor White
+    exit 1
+  }
   $ans = Read-Host 'Voce concorda em prosseguir, por sua conta e risco? [s/N]'
   if ($ans -notmatch '^(s|sim|y|yes)$') {
     Write-ErrMsg 'E preciso aceitar os termos para continuar.'
@@ -131,6 +139,12 @@ function Test-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
   $p  = New-Object Security.Principal.WindowsPrincipal($id)
   return $p.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
+# Há um console que aceita digitação? (false quando a entrada está redirecionada/piped,
+# ex.: 'irm ... | iex' ou execução sem terminal — evita que Read-Host trave para sempre.)
+function Test-Interactive {
+  try { return (-not [Console]::IsInputRedirected) } catch { return $false }
 }
 
 # ============================ TRILHA NATIVA (winget) ============================
@@ -191,14 +205,26 @@ function Install-WingetId($id, $label) {
 function Install-ClaudeCode {
   if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Ok 'Claude Code já instalado.'; return $true }
   Write-Step 'Instalando o Claude Code (instalador oficial, auto-atualizável)...'
+  # IMPORTANTE: o instalador oficial chama 'exit' em vários erros. Rodá-lo inline (no mesmo
+  # processo) derrubaria esta janela e o try/catch não pega 'exit'. Por isso rodamos num
+  # PROCESSO FILHO: o 'exit' morre lá, esta sessão sobrevive e o fallback winget funciona.
+  $tmp = Join-Path $env:TEMP 'claude-install.ps1'
+  $ran = $false
   try {
-    & ([scriptblock]::Create((Invoke-RestMethod -Uri $ClaudeInstallUrl)))
+    Invoke-RestMethod -Uri $ClaudeInstallUrl -OutFile $tmp
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $tmp
+    $ran = ($LASTEXITCODE -eq 0)
   } catch {
-    Write-WarnMsg "Instalador oficial falhou ($($_.Exception.Message)). Tentando via winget..."
+    Write-WarnMsg "Instalador oficial falhou ($($_.Exception.Message))."
+  } finally {
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+  }
+  if (-not $ran) {
+    Write-WarnMsg 'Tentando via winget...'
     return (Install-WingetId 'Anthropic.ClaudeCode' 'Claude Code')
   }
   if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Ok 'Claude Code instalado.'; return $true }
-  Write-WarnMsg 'Claude Code instalado — reabra o terminal para o comando entrar no PATH.'
+  Write-Ok 'Claude Code instalado — reabra o terminal para o comando entrar no PATH.'
   return $true
 }
 
@@ -290,6 +316,10 @@ function Select-Custom {
 # Decide o conjunto: por -Preset ou pelo menu interativo.
 function Resolve-Selection {
   if ($Preset) { return @{ Tier=$Preset; Modules=(Get-PresetModules $Preset) } }
+  if (-not (Test-Interactive)) {
+    Write-WarnMsg 'Sem terminal interativo: usando o tier "recomendado". Para escolher, passe -Preset.'
+    return @{ Tier='recomendado'; Modules=(Get-PresetModules 'recomendado') }
+  }
   Write-Host ''
   Write-Host 'Escolha um tier:' -ForegroundColor White
   Write-Host '  1) Rapido      - so o essencial p/ rodar o Claude Code'

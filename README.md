@@ -1,7 +1,7 @@
 # Encha Vibe Pack
 
 > Instalador local de ferramentas para quem está **começando com o Claude Code**.
-> Um comando, um menu, você escolhe o que instalar. Funciona em **macOS, Linux e Windows (via WSL2)**.
+> Um comando, um menu, você escolhe o que instalar. Funciona em **macOS, Linux e Windows (nativo e via WSL2)**.
 
 O Encha Vibe Pack prepara a máquina do aluno com o essencial para programar com o
 Claude Code — sem despejar uma stack gigante. Você decide **o quê** instalar, seja
@@ -28,12 +28,30 @@ Abra o **PowerShell** e rode:
 irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.1/install.ps1 | iex
 ```
 
-Instala o **Claude Code nativo** (sem WSL, sem Node, com auto-atualização) e as demais
-ferramentas via **winget**, e ajusta o perfil do PowerShell. Ao terminar, abra um PowerShell
-**novo** e use `claude`.
+O instalador exibe um aviso, pede confirmação e abre um menu de tiers — tudo interativo.
+Ao terminar, abra um PowerShell **novo** e use `claude`.
+
+> Instala o **Claude Code nativo** (sem WSL, sem Node, com auto-atualização) e as demais
+> ferramentas via **winget**, e ajusta o perfil do PowerShell.
 
 > Recomendamos manter o **Git for Windows** (já incluso nos tiers) — ele habilita a ferramenta
 > Bash do Claude Code. Sem ele, o Claude usa o PowerShell como shell.
+
+#### Modo não interativo (automação / CI / turmas)
+
+Para rodar **sem menus** (aceita os termos e escolhe o tier automaticamente):
+
+```powershell
+# Tier "rápido" — só o Claude Code + ferramentas de busca
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.0/install.ps1))) -AcceptRisk -Preset rapido
+
+# Tier "recomendado" — essencial + shell, git/IDE
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.0/install.ps1))) -AcceptRisk -Preset recomendado
+```
+
+> `-AcceptRisk` aceita o aviso de isenção de responsabilidade sem digitar `s`.
+> `-Preset` escolhe o tier sem abrir o menu (use `rapido`, `recomendado` ou `completo`).
+> Também funciona via variável de ambiente: `$env:ENCHA_ACCEPT_RISK = '1'`.
 
 #### Windows via WSL2 (avançado)
 
@@ -155,7 +173,7 @@ Estrutura:
 
 ```
 install.sh    Bootstrap (uma linha) — baixa a tag, verifica e roda
-install.ps1   Bootstrap Windows — configura o WSL2 e roda o install.sh
+install.ps1   Bootstrap Windows — modo nativo (winget, sem WSL) ou -Mode wsl (avançado)
 run.sh        Orquestrador: menu, dependências, execução, resumo
 lib/          common (log/exec) · detect (SO) · pkg (brew/apt) · ui (menu) · security
 modules/      Um script idempotente por ferramenta (NN-nome.sh)
