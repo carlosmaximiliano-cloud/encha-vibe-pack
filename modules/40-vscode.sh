@@ -11,9 +11,30 @@ set -euo pipefail
 # shellcheck source=../lib/pkg.sh
 . "$ENCHA_LIB/pkg.sh"
 
+# Resolve um binário 'code' utilizável: o do PATH ou, no macOS, o embutido no app
+# (caso o VS Code tenha sido instalado manualmente, sem expor 'code' no PATH).
+# Imprime o caminho em stdout e retorna 0 se encontrar; senão retorna 1.
+resolve_code_bin() {
+  if command_exists code; then
+    command -v code
+    return 0
+  fi
+  local bundled="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+  if [ "${ENCHA_OS:-}" = "macos" ] && [ -x "$bundled" ]; then
+    printf '%s\n' "$bundled"
+    return 0
+  fi
+  return 1
+}
+
 install_vscode() {
   if command_exists code; then
     log_success "VS Code já disponível (comando 'code')."
+    return 0
+  fi
+  # macOS: o app pode existir sem 'code' no PATH (instalação manual).
+  if [ "${ENCHA_OS:-}" = "macos" ] && [ -d "/Applications/Visual Studio Code.app" ]; then
+    log_success "VS Code já instalado (/Applications/Visual Studio Code.app)."
     return 0
   fi
   if is_dry_run; then
@@ -67,15 +88,23 @@ else
   log_warn "VS Code não foi instalado automaticamente (veja as instruções acima)."
 fi
 
-# Extensão do Claude Code (não-fatal: pode falhar se o 'code' não estiver no PATH).
-if command_exists code && ! is_dry_run; then
-  if code --list-extensions 2>/dev/null | grep -qi 'anthropic.claude-code'; then
-    log_success "Extensão Claude Code já instalada no VS Code."
+# Extensão do Claude Code (não-fatal). Usa o 'code' do PATH ou, no macOS, o
+# binário embutido no app — assim a extensão é instalada mesmo se o VS Code
+# tiver sido instalado manualmente (sem expor 'code' no PATH).
+if ! is_dry_run; then
+  code_bin="$(resolve_code_bin)" || code_bin=""
+  if [ -n "$code_bin" ]; then
+    if "$code_bin" --list-extensions 2>/dev/null | grep -qi 'anthropic.claude-code'; then
+      log_success "Extensão Claude Code já instalada no VS Code."
+    else
+      log_info "Instalando a extensão Claude Code no VS Code…"
+      "$code_bin" --install-extension anthropic.claude-code >/dev/null 2>&1 \
+        && log_success "Extensão Claude Code instalada." \
+        || log_warn "Não consegui instalar a extensão automaticamente."
+    fi
   else
-    log_info "Instalando a extensão Claude Code no VS Code…"
-    code --install-extension anthropic.claude-code >/dev/null 2>&1 \
-      && log_success "Extensão Claude Code instalada." \
-      || log_warn "Não consegui instalar a extensão automaticamente."
+    log_warn "Comando 'code' indisponível — não foi possível instalar a extensão."
+    log_info "Abra o VS Code, pressione Cmd+Shift+P e rode \"Shell Command: Install 'code' command in PATH\"."
   fi
 fi
 log_info "Dica: ao rodar 'claude' no terminal integrado do VS Code, a integração é configurada sozinha."

@@ -17,7 +17,7 @@ por um **tier pronto** (rápido) ou marcando **item a item**.
 ### macOS / Linux / WSL2
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.3/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.sh | bash
 ```
 
 ### Windows (nativo — recomendado)
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-
 Abra o **PowerShell** e rode:
 
 ```powershell
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.3/install.ps1 | iex
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.ps1 | iex
 ```
 
 O instalador exibe um aviso, pede confirmação e abre um menu de tiers — tudo interativo.
@@ -62,7 +62,7 @@ Para quem quer um ambiente **Linux completo** (ex.: sandbox), abra o **PowerShel
 Administrador** e rode:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.3/install.ps1))) -Mode wsl
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.ps1))) -Mode wsl
 ```
 
 Esse modo habilita o WSL2, instala o Ubuntu e roda o instalador lá dentro. Pode pedir um
@@ -130,7 +130,7 @@ Levamos a sério rodar coisas na máquina do aluno:
 
 - **Baixe e inspecione antes de rodar** (recomendado). Em vez do `| bash`, baixe e leia:
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.3/install.sh -o install.sh
+  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.sh -o install.sh
   less install.sh        # leia
   bash install.sh        # rode
   ```
