@@ -20,16 +20,32 @@ por um **tier pronto** (rápido) ou marcando **item a item**.
 curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.1.0/install.sh | bash
 ```
 
-### Windows (configura o WSL2 automaticamente)
+### Windows (nativo — recomendado)
 
-Abra o **PowerShell como Administrador** e rode:
+Abra o **PowerShell** e rode:
 
 ```powershell
 irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.1.0/install.ps1 | iex
 ```
 
-O script habilita o WSL2, instala o Ubuntu e roda o instalador lá dentro.
-Pode pedir um **reinício** — depois é só rodar o comando de novo (ele continua de onde parou).
+Instala o **Claude Code nativo** (sem WSL, sem Node, com auto-atualização) e as demais
+ferramentas via **winget**, e ajusta o perfil do PowerShell. Ao terminar, abra um PowerShell
+**novo** e use `claude`.
+
+> Recomendamos manter o **Git for Windows** (já incluso nos tiers) — ele habilita a ferramenta
+> Bash do Claude Code. Sem ele, o Claude usa o PowerShell como shell.
+
+#### Windows via WSL2 (avançado)
+
+Para quem quer um ambiente **Linux completo** (ex.: sandbox), abra o **PowerShell como
+Administrador** e rode:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.1.0/install.ps1))) -Mode wsl
+```
+
+Esse modo habilita o WSL2, instala o Ubuntu e roda o instalador lá dentro. Pode pedir um
+**reinício** — depois é só rodar o comando de novo (ele continua de onde parou).
 
 ---
 
@@ -177,7 +193,8 @@ A partir daí, o one-liner com `v0.1.0` passa a validar a integridade automatica
 
 - **macOS** 12+ (Intel ou Apple Silicon)
 - **Linux** com `apt`, `dnf` ou `pacman`
-- **Windows** 10 (2004+) ou 11, com suporte a `wsl --install`
+- **Windows** (nativo) 10 1809+ ou 11, com `winget` (App Installer) — **não precisa de Node nem WSL**
+- **Windows** (modo `-Mode wsl`, avançado) 10 (2004+) ou 11, com suporte a `wsl --install`
 
 ---
 

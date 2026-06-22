@@ -25,6 +25,28 @@ Cada seção tem:
 
 ---
 
+## Windows nativo (sem WSL)
+
+No Windows, o instalador roda **nativo** por padrão: instala o **Claude Code nativo**
+(sem Node, sem WSL, com auto-atualização) e as demais ferramentas via **winget**. Os mesmos
+tiers valem, mas algumas ferramentas Linux são substituídas pelo equivalente nativo:
+
+| Ferramenta Linux | Equivalente no Windows nativo |
+|------------------|-------------------------------|
+| Homebrew | **winget** (já vem no Windows 10 1809+/11) |
+| Zsh | **PowerShell 7** (`Microsoft.PowerShell`) |
+| Plugins do Zsh | **PSReadLine** (sugestões + histórico, já no PowerShell 7) |
+| tmux | **Painéis do Windows Terminal** |
+
+Tudo o mais (ripgrep, fd, fzf, bat, eza, zoxide, Starship, gh, VS Code, LazyGit, Nerd Fonts,
+Python/uv, Docker Desktop) instala normalmente via winget. Para quem precisa de um ambiente
+**Linux completo** (ex.: sandbox), há o modo `-Mode wsl` — veja o README.
+
+> **Git for Windows** é instalado em todos os tiers no Windows porque habilita a ferramenta
+> **Bash** do Claude Code. Sem ele, o Claude usa o PowerShell como shell.
+
+---
+
 ## Base do sistema
 
 > Instaladas automaticamente em **qualquer preset**. Não aparecem no menu porque são obrigatórias — tudo o que vem depois depende delas.

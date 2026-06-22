@@ -1,34 +1,44 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Bootstrap do Encha Vibe Pack no Windows: prepara o WSL2 + Ubuntu e roda o
-  instalador (bash) lá dentro.
+  Bootstrap do Encha Vibe Pack no Windows.
 
 .DESCRIPTION
-  Para iniciantes no Windows, o melhor ambiente para o Claude Code é o WSL2.
-  Este script é RE-ENTRANTE: rode, reinicie quando pedido, e rode de novo — ele
-  descobre sozinho em que etapa está:
-    1) Habilita o WSL2 e instala o Ubuntu (pode exigir reinício).
-    2) Garante que exista um usuário Linux (não-root) no Ubuntu.
-    3) Executa o instalador bash dentro do WSL.
+  Dois modos:
+
+  - NATIVO (padrão): instala o Claude Code (instalador oficial, auto-atualizável,
+    sem Node nem WSL) e as demais ferramentas via winget, e ajusta o perfil do
+    PowerShell. Menos fricção para iniciantes — abra o PowerShell e use 'claude'.
+
+  - WSL (avançado, -Mode wsl): habilita o WSL2 + Ubuntu e roda o instalador bash
+    lá dentro. Necessário só para quem quer ambiente Linux completo / sandbox.
 
   TESTE MANUAL (não há como testar Windows fora de uma máquina Windows):
-    - Win10 build < 19041: deve recusar com mensagem clara (sem 'wsl --install').
-    - 1ª instalação: instala WSL+Ubuntu, pede reboot, e ao reabrir o Ubuntu cria o usuário.
-    - 2ª execução: detecta a distro, detecta usuário não-root, e roda o instalador.
+    - Nativo, tier Rápido: instala Claude Code + Git + busca, SEM Node; 'claude' funciona.
+    - Nativo, reexecução: itens já instalados são pulados (idempotente).
+    - -Mode wsl: fluxo antigo (WSL) intacto.
+
+.PARAMETER Mode
+  native (padrão) | wsl.
 
 .PARAMETER Preset
   Preset a instalar sem menu: rapido | recomendado | completo. Vazio = menu interativo.
 
 .PARAMETER Distro
-  Distribuição WSL a usar/instalar (padrão: Ubuntu).
+  (Só no -Mode wsl) Distribuição WSL a usar/instalar (padrão: Ubuntu).
 
 .EXAMPLE
-  # No PowerShell aberto COMO ADMINISTRADOR:
+  # No PowerShell (modo nativo, recomendado):
   irm https://raw.githubusercontent.com/<user>/encha-vibe-pack/<tag>/install.ps1 | iex
+
+.EXAMPLE
+  # Modo WSL (avançado) — abra o PowerShell COMO ADMINISTRADOR:
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/<user>/encha-vibe-pack/<tag>/install.ps1))) -Mode wsl
 #>
 [CmdletBinding()]
 param(
+  [ValidateSet('native', 'wsl')]
+  [string]$Mode = 'native',
   [ValidateSet('', 'rapido', 'recomendado', 'completo')]
   [string]$Preset = '',
   [string]$Distro = 'Ubuntu',
@@ -44,6 +54,7 @@ $env:WSL_UTF8 = '1'
 $Repo = $env:ENCHA_REPO; if (-not $Repo) { $Repo = 'carlosmaximiliano-cloud/encha-vibe-pack' }
 $Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.1.0' }
 $Url  = "https://raw.githubusercontent.com/$Repo/$Ref/install.sh"
+$ClaudeInstallUrl = 'https://claude.ai/install.ps1'
 
 # --- Saída amigável ---
 function Write-Step($msg)    { Write-Host "`n==> $msg" -ForegroundColor Cyan }
@@ -68,36 +79,45 @@ function Assert-Inputs {
   }
 }
 
-# --- Aviso de isenção de responsabilidade ---
+# --- Aviso de isenção de responsabilidade (ciente do modo) ---
 function Show-Disclaimer {
+  param([switch]$Wsl)
+  $inner = 60
+  $body = @(
+    '',
+    'Este instalador e GRATUITO, esta em VERSAO BETA e e',
+    'fornecido SEM QUALQUER GARANTIA (licenca MIT).',
+    '',
+    'O que ele faz na sua maquina:'
+  )
+  if ($Wsl) {
+    $body += '  - Habilita o WSL2 e instala o Ubuntu (pode reiniciar)'
+    $body += '  - Instala pacotes e edita configs de shell no Linux'
+  } else {
+    $body += '  - Instala apps via winget (Claude Code, Git, VS Code...)'
+    $body += '  - Edita seu perfil do PowerShell (Starship, sugestoes)'
+  }
+  $body += ''
+  $body += 'Ao prosseguir, voce assume os riscos pelo uso.'
+  $body += ''
+
+  $border = '  +' + ('-' * $inner) + '+'
   Write-Host ''
-  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
-  Write-Host '  |  !   AVISO -- leia antes de prosseguir                      |' -ForegroundColor Yellow
-  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
-  Write-Host '  |                                                             |' -ForegroundColor Yellow
-  Write-Host '  |  Este instalador e ' -ForegroundColor Yellow -NoNewline
-  Write-Host 'GRATUITO' -ForegroundColor White -NoNewline
-  Write-Host ', esta em ' -ForegroundColor Yellow -NoNewline
-  Write-Host 'VERSAO BETA' -ForegroundColor White -NoNewline
-  Write-Host ' e e        |' -ForegroundColor Yellow
-  Write-Host '  |  fornecido ' -ForegroundColor Yellow -NoNewline
-  Write-Host 'SEM QUALQUER GARANTIA' -ForegroundColor White -NoNewline
-  Write-Host ' (licenca MIT).          |' -ForegroundColor Yellow
-  Write-Host '  |                                                             |' -ForegroundColor Yellow
-  Write-Host '  |  O que ele faz na sua maquina:                             |' -ForegroundColor Yellow
-  Write-Host '  |  * Habilita o WSL2 e instala o Ubuntu (pode reiniciar)     |' -ForegroundColor Yellow
-  Write-Host '  |  * Instala pacotes e edita configs de shell no Linux        |' -ForegroundColor Yellow
-  Write-Host '  |                                                             |' -ForegroundColor Yellow
-  Write-Host '  |  Ao prosseguir, voce assume os riscos pelo uso.            |' -ForegroundColor Yellow
-  Write-Host '  |                                                             |' -ForegroundColor Yellow
-  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
+  Write-Host $border -ForegroundColor Yellow
+  Write-Host ('  |' + (' !  AVISO -- leia antes de prosseguir').PadRight($inner) + '|') -ForegroundColor Yellow
+  Write-Host $border -ForegroundColor Yellow
+  foreach ($l in $body) {
+    Write-Host ('  |' + (' ' + $l).PadRight($inner) + '|') -ForegroundColor Yellow
+  }
+  Write-Host $border -ForegroundColor Yellow
   Write-Host ''
 }
 
 # Garante o aceite do aviso. Aceita via -AcceptRisk, env ENCHA_ACCEPT_RISK=1,
 # -Preset (análogo ao --yes) ou resposta interativa (default = Não).
 function Confirm-Risk {
-  Show-Disclaimer
+  param([switch]$Wsl)
+  Show-Disclaimer -Wsl:$Wsl
   if ($AcceptRisk -or ($env:ENCHA_ACCEPT_RISK -eq '1') -or $Preset) { return }
   $ans = Read-Host 'Voce concorda em prosseguir, por sua conta e risco? [s/N]'
   if ($ans -notmatch '^(s|sim|y|yes)$') {
@@ -113,19 +133,229 @@ function Test-Admin {
   return $p.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
 }
 
-# Reexecuta o script como administrador, se necessário.
+# ============================ TRILHA NATIVA (winget) ============================
+
+# Garante o winget disponível; senão, orienta instalar o App Installer.
+function Test-Winget {
+  if (Get-Command winget -ErrorAction SilentlyContinue) { return $true }
+  Write-ErrMsg 'winget não encontrado nesta máquina.'
+  Write-Host   'Instale o "App Installer" pela Microsoft Store (ou atualize o Windows) e rode de novo:' -ForegroundColor White
+  Write-Host   '  https://aka.ms/getwinget' -ForegroundColor White
+  return $false
+}
+
+# Mapa (ordem do catálogo) módulo -> ação no Windows. Única duplicação Windows-específica.
+# Type: winget | claude | profile | skip.  SkipInTiers: pula o módulo nesses presets.
+function Get-WingetMap {
+  return @(
+    [pscustomobject]@{ Module='00-prereqs.sh';     Type='winget';  Label='Git for Windows';                       Ids=@('Git.Git') }
+    [pscustomobject]@{ Module='01-homebrew.sh';    Type='skip';    Label='Homebrew';                              Reason='no Windows o winget já é o gerenciador' }
+    [pscustomobject]@{ Module='10-node-fnm.sh';    Type='winget';  Label='Node.js LTS';                           Ids=@('OpenJS.NodeJS.LTS'); SkipInTiers=@('rapido') }
+    [pscustomobject]@{ Module='11-claude-code.sh'; Type='claude';  Label='Claude Code (instalador nativo)' }
+    [pscustomobject]@{ Module='20-cli-tools.sh';   Type='winget';  Label='Busca no terminal (ripgrep, fd, fzf)';  Ids=@('BurntSushi.ripgrep.MSVC','sharkdp.fd','junegunn.fzf') }
+    [pscustomobject]@{ Module='21-modern-unix.sh'; Type='winget';  Label='Unix moderno (bat, eza, zoxide)';       Ids=@('sharkdp.bat','eza-community.eza','ajeetdsouza.zoxide'); Profile=@('Invoke-Expression (& { (zoxide init powershell | Out-String) })') }
+    [pscustomobject]@{ Module='12-gh.sh';          Type='winget';  Label='GitHub CLI (gh)';                       Ids=@('GitHub.cli') }
+    [pscustomobject]@{ Module='30-zsh.sh';         Type='winget';  Label='PowerShell 7 (shell moderno)';          Ids=@('Microsoft.PowerShell') }
+    [pscustomobject]@{ Module='31-starship.sh';    Type='winget';  Label='Starship (prompt bonito)';              Ids=@('Starship.Starship'); Profile=@('Invoke-Expression (&starship init powershell)') }
+    [pscustomobject]@{ Module='32-zsh-plugins.sh'; Type='profile'; Label='Sugestões no PowerShell (PSReadLine)';  Profile=@('Set-PSReadLineOption -PredictionSource History','Set-PSReadLineOption -PredictionViewStyle ListView') }
+    [pscustomobject]@{ Module='33-nerd-fonts.sh';  Type='winget';  Label='Nerd Font (FiraCode)';                  Ids=@('DEVCOM.FiraCodeNerdFont') }
+    [pscustomobject]@{ Module='40-vscode.sh';      Type='winget';  Label='VS Code + extensão Claude Code';        Ids=@('Microsoft.VisualStudioCode'); VscodeExt='anthropic.claude-code' }
+    [pscustomobject]@{ Module='41-lazygit.sh';     Type='winget';  Label='LazyGit';                               Ids=@('JesseDuffield.lazygit') }
+    [pscustomobject]@{ Module='50-containers.sh';  Type='winget';  Label='Docker Desktop';                        Ids=@('Docker.DockerDesktop') }
+    [pscustomobject]@{ Module='51-tmux.sh';        Type='skip';    Label='tmux';                                  Reason='use os painéis do Windows Terminal' }
+    [pscustomobject]@{ Module='60-python-uv.sh';   Type='winget';  Label='Python (via uv)';                       Ids=@('astral-sh.uv') }
+  )
+}
+
+# Já instalado? (idempotência)
+function Test-WingetInstalled($id) {
+  & winget list --id $id -e --accept-source-agreements *> $null
+  return ($LASTEXITCODE -eq 0)
+}
+
+# Instala um pacote winget. Tenta --scope user; cai para sem escopo se necessário.
+function Install-WingetId($id, $label) {
+  if (Test-WingetInstalled $id) { Write-Ok "$label já instalado."; return $true }
+  Write-Step "Instalando $label ($id)..."
+  & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements --scope user
+  if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
+  if ($LASTEXITCODE -eq -1978335189) { Write-Ok "$label já estava atualizado."; return $true }
+  # Alguns pacotes só têm escopo de máquina — tenta sem --scope (pode pedir UAC).
+  & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements
+  if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
+  Write-WarnMsg "Falha ao instalar $label (winget código $LASTEXITCODE)."
+  return $false
+}
+
+# Instala o Claude Code pelo instalador oficial (auto-atualizável). Fallback: winget.
+function Install-ClaudeCode {
+  if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Ok 'Claude Code já instalado.'; return $true }
+  Write-Step 'Instalando o Claude Code (instalador oficial, auto-atualizável)...'
+  try {
+    & ([scriptblock]::Create((Invoke-RestMethod -Uri $ClaudeInstallUrl)))
+  } catch {
+    Write-WarnMsg "Instalador oficial falhou ($($_.Exception.Message)). Tentando via winget..."
+    return (Install-WingetId 'Anthropic.ClaudeCode' 'Claude Code')
+  }
+  if (Get-Command claude -ErrorAction SilentlyContinue) { Write-Ok 'Claude Code instalado.'; return $true }
+  Write-WarnMsg 'Claude Code instalado — reabra o terminal para o comando entrar no PATH.'
+  return $true
+}
+
+# Instala a extensão do VS Code, se o comando 'code' já estiver no PATH desta sessão.
+function Install-VscodeExt($ext) {
+  if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
+    Write-WarnMsg "VS Code recém-instalado: reabra o terminal e rode 'code --install-extension $ext'."
+    return
+  }
+  & code --install-extension $ext --force | Out-Null
+  if ($LASTEXITCODE -eq 0) { Write-Ok "Extensão $ext instalada." } else { Write-WarnMsg "Falha ao instalar a extensão $ext." }
+}
+
+# Caminho do perfil do PowerShell 7 (honra redirecionamento do OneDrive).
+function Get-Pwsh7Profile {
+  $docs = [Environment]::GetFolderPath('MyDocuments')
+  return (Join-Path $docs 'PowerShell\Microsoft.PowerShell_profile.ps1')
+}
+
+# Acrescenta linhas ao perfil só se ainda não existirem (idempotente, como add_line_once).
+function Add-ProfileLines($lines) {
+  if (-not $lines) { return }
+  $p = Get-Pwsh7Profile
+  $dir = Split-Path $p
+  if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+  if (-not (Test-Path $p))   { New-Item -ItemType File -Path $p -Force | Out-Null }
+  $existing = Get-Content -LiteralPath $p -Raw -ErrorAction SilentlyContinue
+  if ($null -eq $existing) { $existing = '' }
+  foreach ($line in $lines) {
+    if ($existing -notlike "*$line*") {
+      Add-Content -LiteralPath $p -Value $line
+      $existing += "`n$line"
+      Write-Ok "Perfil atualizado: $line"
+    }
+  }
+}
+
+# Aplica uma entrada do mapa. Retorna 'ok' | 'fail' | 'skip'.
+function Invoke-MapEntry($entry, $activeTier) {
+  if ($entry.SkipInTiers -and $activeTier -and ($entry.SkipInTiers -contains $activeTier)) {
+    Write-Host "  - pulando $($entry.Label) (não incluso no tier $activeTier)" -ForegroundColor DarkGray
+    return 'skip'
+  }
+  switch ($entry.Type) {
+    'skip'    { Write-Host "  - pulando $($entry.Label): $($entry.Reason)" -ForegroundColor DarkGray; return 'skip' }
+    'claude'  { if (Install-ClaudeCode) { return 'ok' } else { return 'fail' } }
+    'profile' { Add-ProfileLines $entry.Profile; Write-Ok "$($entry.Label) configurado."; return 'ok' }
+    default {
+      $allok = $true
+      foreach ($id in $entry.Ids) { if (-not (Install-WingetId $id $entry.Label)) { $allok = $false } }
+      if ($entry.Profile)   { Add-ProfileLines $entry.Profile }
+      if ($entry.VscodeExt) { Install-VscodeExt $entry.VscodeExt }
+      if ($allok) { return 'ok' } else { return 'fail' }
+    }
+  }
+}
+
+# Baixa um preset do GitHub raw e devolve a lista de módulos (ignora # e vazias).
+function Get-PresetModules($preset) {
+  $u = "https://raw.githubusercontent.com/$Repo/$Ref/presets/$preset.txt"
+  try { $raw = Invoke-RestMethod -Uri $u } catch {
+    Write-ErrMsg "Não consegui baixar o preset '$preset' ($u)."; exit 1
+  }
+  return ($raw -split "`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -and ($_ -notlike '#*') }
+}
+
+# Seleção personalizada (item a item). Default = conjunto do Recomendado.
+function Select-Custom {
+  $map = @(Get-WingetMap | Where-Object { $_.Type -ne 'skip' })
+  $rec = Get-PresetModules 'recomendado'
+  Write-Host ''
+  Write-Host 'Itens disponíveis (números separados por espaço; Enter = Recomendado):' -ForegroundColor White
+  for ($i = 0; $i -lt $map.Count; $i++) {
+    $mark = if ($rec -contains $map[$i].Module) { '*' } else { ' ' }
+    Write-Host ("  [{0}] {1,2}) {2}" -f $mark, ($i + 1), $map[$i].Label)
+  }
+  $inp = Read-Host 'Seleção'
+  if (-not $inp) { return @{ Tier=''; Modules=$rec } }
+  $chosen = @()
+  foreach ($tok in ($inp -split '\s+')) {
+    if ($tok -match '^\d+$') {
+      $idx = [int]$tok - 1
+      if ($idx -ge 0 -and $idx -lt $map.Count) { $chosen += $map[$idx].Module }
+    }
+  }
+  return @{ Tier=''; Modules=$chosen }
+}
+
+# Decide o conjunto: por -Preset ou pelo menu interativo.
+function Resolve-Selection {
+  if ($Preset) { return @{ Tier=$Preset; Modules=(Get-PresetModules $Preset) } }
+  Write-Host ''
+  Write-Host 'Escolha um tier:' -ForegroundColor White
+  Write-Host '  1) Rapido      - so o essencial p/ rodar o Claude Code'
+  Write-Host '  2) Recomendado - essencial + shell + git/IDE'
+  Write-Host '  3) Completo    - recomendado + Docker, Python'
+  Write-Host '  4) Personalizado'
+  Write-Host '  0) Cancelar'
+  $c = Read-Host 'Opcao [2]'
+  if (-not $c) { $c = '2' }
+  switch ($c) {
+    '1' { return @{ Tier='rapido';      Modules=(Get-PresetModules 'rapido') } }
+    '2' { return @{ Tier='recomendado'; Modules=(Get-PresetModules 'recomendado') } }
+    '3' { return @{ Tier='completo';    Modules=(Get-PresetModules 'completo') } }
+    '4' { return (Select-Custom) }
+    '0' { Write-Host 'Cancelado.'; exit 0 }
+    default { Write-WarnMsg "Opção inválida: $c"; exit 1 }
+  }
+}
+
+# Orquestra a instalação nativa.
+function Invoke-NativeInstall {
+  Confirm-Risk
+  if (-not (Test-Winget)) { exit 1 }
+
+  $sel = Resolve-Selection
+  $modules = @($sel.Modules)
+  if ($modules.Count -eq 0) { Write-WarnMsg 'Nada selecionado. Encerrando.'; exit 0 }
+
+  $okN = 0; $failN = 0; $skipN = 0; $failed = @()
+  foreach ($entry in (Get-WingetMap)) {
+    if ($modules -contains $entry.Module) {
+      switch (Invoke-MapEntry $entry $sel.Tier) {
+        'ok'   { $okN++ }
+        'fail' { $failN++; $failed += $entry.Label }
+        'skip' { $skipN++ }
+      }
+    }
+  }
+
+  Write-Host ''
+  Write-Step 'Resumo'
+  Write-Ok "Concluidos: $okN"
+  if ($skipN -gt 0) { Write-Host "  Pulados: $skipN" -ForegroundColor DarkGray }
+  if ($failN -gt 0) {
+    Write-WarnMsg "Com falha: $failN"
+    $failed | ForEach-Object { Write-Host "   - $_" -ForegroundColor Yellow }
+  }
+  Write-Host ''
+  Write-Ok 'Pronto! Abra um PowerShell NOVO e rode: claude'
+  if ($failN -gt 0) { exit 1 } else { exit 0 }
+}
+
+# ============================ TRILHA WSL (avançado) ============================
+
+# Reexecuta o script como administrador, se necessário (só no modo WSL).
 function Invoke-Elevation {
   if (Test-Admin) { return }
-  # Rodando via `irm | iex` não há arquivo para re-executar elevado.
   if (-not $PSCommandPath) {
     Write-ErrMsg 'Este passo precisa de administrador.'
     Write-Host   'Feche este PowerShell e reabra-o COMO ADMINISTRADOR' -ForegroundColor White
-    Write-Host   '(menu Iniciar > digite "PowerShell" > clique com o botão direito > "Executar como administrador"),' -ForegroundColor White
+    Write-Host   '(menu Iniciar > digite "PowerShell" > botão direito > "Executar como administrador"),' -ForegroundColor White
     Write-Host   'e rode A MESMA linha de comando novamente.' -ForegroundColor White
     exit 1
   }
   Write-WarnMsg 'Este passo precisa de privilégios de administrador. Solicitando elevação...'
-  $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Distro', $Distro)
+  $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Mode', 'wsl', '-Distro', $Distro)
   if ($Preset)          { $argList += @('-Preset', $Preset) }
   if ($AllowUnverified) { $argList += '-AllowUnverified' }
   # O aviso já foi aceito antes da elevação — não pergunta de novo na janela elevada.
@@ -138,13 +368,8 @@ function Invoke-Elevation {
   exit 0
 }
 
-function Test-WslPresent {
-  return [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue)
-}
-
-function Get-WindowsBuild {
-  return [int][System.Environment]::OSVersion.Version.Build
-}
+function Test-WslPresent { return [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue) }
+function Get-WindowsBuild { return [int][System.Environment]::OSVersion.Version.Build }
 
 # Lista distros instaladas (nomes "limpos"). Tolera UTF-16 residual e linhas vazias.
 function Get-WslDistros {
@@ -164,7 +389,6 @@ function Test-DistroInstalled($name) {
   return $false
 }
 
-# Define o WSL2 como padrão; avisa (sem abortar) se faltar o kernel.
 function Set-WslDefaultV2 {
   & wsl.exe --set-default-version 2 | Out-Null
   if ($LASTEXITCODE -ne 0) {
@@ -173,17 +397,13 @@ function Set-WslDefaultV2 {
   }
 }
 
-# Etapa 1 — habilitar WSL2 + instalar a distro. Retorna $true se a distro está registrada.
 function Step-InstallWsl {
   Write-Step "Verificando o WSL2 e a distro '$Distro'..."
-
   if (Test-DistroInstalled $Distro) {
     Write-Ok "Distro compatível com '$Distro' já instalada."
     Set-WslDefaultV2
     return $true
   }
-
-  # Para instalar, precisamos de Windows compatível e do wsl.exe.
   $build = Get-WindowsBuild
   if ($build -lt 19041) {
     Write-ErrMsg "Seu Windows (build $build) não suporta 'wsl --install' (requer 2004+ / build 19041)."
@@ -206,7 +426,6 @@ function Step-InstallWsl {
     Write-Ok "WSL/$Distro instalado."
     return $true
   }
-
   if ($installCode -ne 0) {
     Write-WarnMsg "O 'wsl --install' retornou código $installCode."
   }
@@ -217,36 +436,28 @@ function Step-InstallWsl {
   return $false
 }
 
-# Etapa 2 — garante um usuário não-root (o Homebrew se recusa a rodar como root).
-# Retorna $true só se a distro roda E o usuário padrão não é root.
+# Garante um usuário não-root (o Homebrew se recusa a rodar como root).
 function Test-NonRootUser {
   $who = & wsl.exe -d $Distro -- bash -lc 'whoami' 2>$null
-  if ($LASTEXITCODE -ne 0) { return $false }   # distro não inicializou (talvez falte reboot/1º boot)
+  if ($LASTEXITCODE -ne 0) { return $false }
   if ($who) { $who = ($who -replace "`0", '').Trim() }
   return ($who -and ($who -ne 'root'))
 }
 
-# Etapa 3 — roda o instalador bash dentro do WSL.
+# Roda o instalador bash dentro do WSL.
 function Step-RunInstaller {
   Write-Step "Executando o instalador dentro do WSL ($Distro)..."
-
-  # Garante o curl como ROOT (sem sudo → sem prompt de senha sem TTY).
   & wsl.exe -d $Distro --user root -- bash -lc 'command -v curl >/dev/null 2>&1 || (apt-get update -y && apt-get install -y curl)'
   if ($LASTEXITCODE -ne 0) {
     Write-WarnMsg 'Não consegui garantir o curl no Ubuntu (seguindo mesmo assim).'
   }
-
-  # O aviso já foi aceito do lado do Windows — propaga para o run.sh não repetir.
   $envPrefix = 'ENCHA_ACCEPT_RISK=1 '
   if ($AllowUnverified) { $envPrefix += 'ENCHA_ALLOW_UNVERIFIED=1 ' }
   $bashArgs = ''
   if ($Preset) { $bashArgs = " -- --preset $Preset" }
-
-  # Roda como o usuário padrão (não-root). A URL vai entre aspas simples no bash.
   $cmd = "curl -fsSL '$Url' | ${envPrefix}bash -s$bashArgs"
   & wsl.exe -d $Distro -- bash -lc $cmd
   $code = $LASTEXITCODE
-
   if ($code -eq 0) {
     Write-Ok 'Instalação concluída dentro do WSL.'
     return $true
@@ -255,33 +466,38 @@ function Step-RunInstaller {
   return $false
 }
 
+function Invoke-WslInstall {
+  Confirm-Risk -Wsl
+  if (-not (Step-InstallWsl)) {
+    Write-WarnMsg 'Etapa do WSL ainda não concluída. Reinicie/abra o Ubuntu conforme indicado e rode novamente.'
+    exit 1
+  }
+  if (-not (Test-NonRootUser)) {
+    Write-WarnMsg "Não consegui rodar comandos no '$Distro' como usuário comum."
+    Write-Host    'Possíveis causas e solução:' -ForegroundColor White
+    Write-Host    "  - Se você acabou de instalar o WSL, talvez precise REINICIAR o Windows." -ForegroundColor White
+    Write-Host    "  - Abra o app '$Distro' uma vez e crie seu usuário e senha do Linux." -ForegroundColor White
+    Write-Host    '  Depois, rode esta mesma linha de comando novamente.' -ForegroundColor White
+    exit 1
+  }
+  if (Step-RunInstaller) {
+    Write-Host ''
+    Write-Ok "Tudo pronto! Abra o '$Distro' (ou o Windows Terminal) e comece com: claude"
+    exit 0
+  } else {
+    exit 1
+  }
+}
+
 # ----------------------------- Fluxo principal -----------------------------
 Assert-Inputs
 
 Write-Host ''
-Write-Host '  Encha Vibe Pack — bootstrap para Windows (via WSL2)' -ForegroundColor Cyan
-Write-Host "  repo: $Repo  -  ref: $Ref" -ForegroundColor DarkGray
+Write-Host '  Encha Vibe Pack - instalador para Windows' -ForegroundColor Cyan
+Write-Host "  repo: $Repo  -  ref: $Ref  -  modo: $Mode" -ForegroundColor DarkGray
 
-Confirm-Risk
-
-if (-not (Step-InstallWsl)) {
-  Write-WarnMsg 'Etapa do WSL ainda não concluída. Reinicie/abra o Ubuntu conforme indicado e rode novamente.'
-  exit 1
-}
-
-if (-not (Test-NonRootUser)) {
-  Write-WarnMsg "Não consegui rodar comandos no '$Distro' como usuário comum."
-  Write-Host    'Possíveis causas e solução:' -ForegroundColor White
-  Write-Host    "  - Se você acabou de instalar o WSL, talvez precise REINICIAR o Windows." -ForegroundColor White
-  Write-Host    "  - Abra o app '$Distro' uma vez e crie seu usuário e senha do Linux." -ForegroundColor White
-  Write-Host    '  Depois, rode esta mesma linha de comando novamente.' -ForegroundColor White
-  exit 1
-}
-
-if (Step-RunInstaller) {
-  Write-Host ''
-  Write-Ok "Tudo pronto! Abra o '$Distro' (ou o Windows Terminal) e comece com: claude"
-  exit 0
+if ($Mode -eq 'wsl') {
+  Invoke-WslInstall
 } else {
-  exit 1
+  Invoke-NativeInstall
 }
