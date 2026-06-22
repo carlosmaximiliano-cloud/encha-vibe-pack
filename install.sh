@@ -18,12 +18,45 @@ set -euo pipefail
 
 # --- Configuração do release (preenchida ao publicar uma tag) ---
 ENCHA_REPO="${ENCHA_REPO:-carlosmaximiliano-cloud/encha-vibe-pack}"
-ENCHA_REF="${ENCHA_REF:-v0.2.1}"                     # tag fixa
-ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-0b02a474b8067dc8275703d333082e704de9612599420d330c9dbea75043c2c3}"     # SHA-256 do tarball (v0.2.1)
+ENCHA_REF="${ENCHA_REF:-v0.2.2}"                     # tag fixa
+ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-0b02a474b8067dc8275703d333082e704de9612599420d330c9dbea75043c2c3}"     # SHA-256 do tarball (v0.2.2)
 ENCHA_HOME="${ENCHA_HOME:-$HOME/.encha-vibe-pack}"
 
 say() { printf '%s\n' "$*" >&2; }
 die() { printf 'erro: %s\n' "$*" >&2; exit 1; }
+
+print_disclaimer() {
+  local Y='\033[1;33m' R='\033[0m' B='\033[1m'
+  printf '\n' >&2
+  printf "${Y}  ┌─────────────────────────────────────────────────────────────┐${R}\n" >&2
+  printf "${Y}  │${R}  ⚠   AVISO — leia antes de prosseguir                    ${Y}│${R}\n" >&2
+  printf "${Y}  ├─────────────────────────────────────────────────────────────┤${R}\n" >&2
+  printf "${Y}  │${R}                                                             ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  O Encha Vibe Pack é ${B}GRATUITO${R}, está em ${B}VERSÃO BETA${R} e é     ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  fornecido ${B}SEM QUALQUER GARANTIA${R} (licença MIT).          ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}                                                             ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  O que ele faz na sua máquina:                             ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  • Instala pacotes via Homebrew, npm e gestores nativos    ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  • Edita ~/.zshrc e ~/.bashrc                              ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}                                                             ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}  Ao prosseguir, você assume os riscos pelo uso.            ${Y}│${R}\n" >&2
+  printf "${Y}  │${R}                                                             ${Y}│${R}\n" >&2
+  printf "${Y}  └─────────────────────────────────────────────────────────────┘${R}\n" >&2
+  printf '\n' >&2
+}
+
+confirm_disclaimer() {
+  [ "${ENCHA_ACCEPT_RISK:-0}" = "1" ] && return 0
+  if ! ( exec </dev/tty ) >/dev/null 2>&1; then
+    die "sem terminal interativo. Para automatizar, defina ENCHA_ACCEPT_RISK=1."
+  fi
+  printf '  Deseja continuar com a instalação? [s/N] ' >&2
+  local r; read -r r </dev/tty || die "abortado."
+  case "$r" in
+    s|S|sim|y|Y|yes) return 0 ;;
+    *) die "Instalação cancelada." ;;
+  esac
+}
 
 # Diretório deste script em disco (vazio sob curl|bash).
 self_dir() {
@@ -51,6 +84,9 @@ main() {
   fi
 
   # 2) Modo remoto.
+  print_disclaimer
+  confirm_disclaimer
+
   command -v curl >/dev/null 2>&1 || die "curl é necessário para o bootstrap."
   command -v tar  >/dev/null 2>&1 || die "tar é necessário para o bootstrap."
 
@@ -83,11 +119,6 @@ main() {
       die "checksum NÃO confere — abortando. esperado=$ENCHA_TARBALL_SHA256 obtido=$got"
     fi
     say "✓ Integridade verificada (SHA-256)."
-  else
-    # SHA não embutido: a autenticidade já é garantida pelo HTTPS do GitHub.
-    # Só bloqueia se o usuário explicitamente desativar a verificação E estiver
-    # rodando de um arquivo local sem ENCHA_ALLOW_UNVERIFIED (caso de dev avançado).
-    say "ℹ  Download via HTTPS verificado. Prosseguindo com a instalação…"
   fi
 
   # Defesa contra path traversal: recusa entradas com caminho absoluto ou "..".
