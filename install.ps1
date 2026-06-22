@@ -54,7 +54,7 @@ $env:WSL_UTF8 = '1'
 
 # --- Configuração do release (mesma do install.sh) ---
 $Repo = $env:ENCHA_REPO; if (-not $Repo) { $Repo = 'carlosmaximiliano-cloud/encha-vibe-pack' }
-$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.2' }
+$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.3' }
 $Url  = "https://raw.githubusercontent.com/$Repo/$Ref/install.sh"
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
 
