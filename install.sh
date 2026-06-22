@@ -19,7 +19,7 @@ set -euo pipefail
 # --- Configuração do release (preenchida ao publicar uma tag) ---
 ENCHA_REPO="${ENCHA_REPO:-carlosmaximiliano-cloud/encha-vibe-pack}"
 ENCHA_REF="${ENCHA_REF:-v0.2.3}"                     # tag fixa
-ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-}"     # SHA-256 do tarball (preenchido após criar a tag)
+ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-576f4998366b85c0ca5769890eee7be23f64409ae7d32cbdf14d12f4ca9c4244}"     # SHA-256 do tarball (v0.2.3)
 ENCHA_HOME="${ENCHA_HOME:-$HOME/.encha-vibe-pack}"
 
 say() { printf '%s\n' "$*" >&2; }
