@@ -193,10 +193,12 @@ function Install-WingetId($id, $label) {
   Write-Step "Instalando $label ($id)..."
   & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements --scope user
   if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
-  if ($LASTEXITCODE -eq -1978335189) { Write-Ok "$label já estava atualizado."; return $true }
+  # -1978335189 = PACKAGE_ALREADY_INSTALLED; -1978335212 = NO_APPLICABLE_UPDATE (já na versão mais recente)
+  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label já instalado."; return $true }
   # Alguns pacotes só têm escopo de máquina — tenta sem --scope (pode pedir UAC).
   & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements
   if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
+  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label já instalado."; return $true }
   Write-WarnMsg "Falha ao instalar $label (winget código $LASTEXITCODE)."
   return $false
 }
