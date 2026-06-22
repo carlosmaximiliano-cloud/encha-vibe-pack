@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+# Requires PowerShell 5.1+  (diretiva #Requires removida: invalida em scriptblock dinamico via irm)
 <#
 .SYNOPSIS
   Bootstrap do Encha Vibe Pack no Windows.
