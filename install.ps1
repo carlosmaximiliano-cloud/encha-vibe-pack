@@ -71,12 +71,26 @@ function Assert-Inputs {
 # --- Aviso de isenção de responsabilidade ---
 function Show-Disclaimer {
   Write-Host ''
-  Write-Host '  Aviso importante' -ForegroundColor Yellow
-  Write-Host '  O Encha Vibe Pack e um instalador GRATUITO, em versao BETA e fornecido' -ForegroundColor White
-  Write-Host '  SEM QUALQUER GARANTIA (veja a LICENSE/MIT). Ele habilita o WSL2 e instala' -ForegroundColor White
-  Write-Host '  o Ubuntu (pode exigir reinicio), depois instala pacotes e altera config de' -ForegroundColor White
-  Write-Host '  shell dentro do Linux. Ao prosseguir, voce assume os riscos e a' -ForegroundColor White
-  Write-Host '  responsabilidade pelo uso.' -ForegroundColor White
+  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
+  Write-Host '  |  !   AVISO -- leia antes de prosseguir                      |' -ForegroundColor Yellow
+  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
+  Write-Host '  |                                                             |' -ForegroundColor Yellow
+  Write-Host '  |  Este instalador e ' -ForegroundColor Yellow -NoNewline
+  Write-Host 'GRATUITO' -ForegroundColor White -NoNewline
+  Write-Host ', esta em ' -ForegroundColor Yellow -NoNewline
+  Write-Host 'VERSAO BETA' -ForegroundColor White -NoNewline
+  Write-Host ' e e        |' -ForegroundColor Yellow
+  Write-Host '  |  fornecido ' -ForegroundColor Yellow -NoNewline
+  Write-Host 'SEM QUALQUER GARANTIA' -ForegroundColor White -NoNewline
+  Write-Host ' (licenca MIT).          |' -ForegroundColor Yellow
+  Write-Host '  |                                                             |' -ForegroundColor Yellow
+  Write-Host '  |  O que ele faz na sua maquina:                             |' -ForegroundColor Yellow
+  Write-Host '  |  * Habilita o WSL2 e instala o Ubuntu (pode reiniciar)     |' -ForegroundColor Yellow
+  Write-Host '  |  * Instala pacotes e edita configs de shell no Linux        |' -ForegroundColor Yellow
+  Write-Host '  |                                                             |' -ForegroundColor Yellow
+  Write-Host '  |  Ao prosseguir, voce assume os riscos pelo uso.            |' -ForegroundColor Yellow
+  Write-Host '  |                                                             |' -ForegroundColor Yellow
+  Write-Host '  +-------------------------------------------------------------+' -ForegroundColor Yellow
   Write-Host ''
 }
 
