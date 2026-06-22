@@ -1,0 +1,14 @@
+# Tier Recomendado — essencial + experiência de shell + git/IDE.
+00-prereqs.sh
+01-homebrew.sh
+10-node-fnm.sh
+11-claude-code.sh
+20-cli-tools.sh
+21-modern-unix.sh
+12-gh.sh
+30-zsh.sh
+31-starship.sh
+32-zsh-plugins.sh
+33-nerd-fonts.sh
+40-vscode.sh
+41-lazygit.sh

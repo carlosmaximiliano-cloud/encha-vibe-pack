@@ -1,0 +1,12 @@
+# Logs e artefatos de execução
+*.log
+/logs/
+.encha-vibe-pack/
+
+# macOS
+.DS_Store
+
+# Temporários
+*.tmp
+*.bak
+tmp/

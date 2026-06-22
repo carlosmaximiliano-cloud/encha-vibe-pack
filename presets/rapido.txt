@@ -1,0 +1,7 @@
+# Tier Rápido — só o essencial para começar a usar o Claude Code.
+# Uma linha por módulo. Comentários começam com #.
+00-prereqs.sh
+01-homebrew.sh
+10-node-fnm.sh
+11-claude-code.sh
+20-cli-tools.sh

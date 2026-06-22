@@ -1,0 +1,30 @@
+name: lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: ShellCheck + bash -n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o ShellCheck
+        run: sudo apt-get update -y && sudo apt-get install -y shellcheck
+
+      - name: Checagem de sintaxe (bash -n)
+        run: |
+          set -e
+          for f in install.sh run.sh lib/*.sh modules/*.sh; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck
+        run: |
+          # SC1091: não seguimos os 'source' dinâmicos (libs resolvidas em runtime).
+          shellcheck --severity=warning --exclude=SC1091 \
+            install.sh run.sh lib/*.sh modules/*.sh
