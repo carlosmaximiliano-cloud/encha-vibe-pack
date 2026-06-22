@@ -7,6 +7,26 @@
 # Uso:
 #   tools/update-checksum.sh [<tag>]
 # Ex.: tools/update-checksum.sh v0.1.0
+#
+# ⚠ LIMITAÇÃO CONHECIDA (checksum circular) — IMPORTANTE:
+#   O SHA-256 é gravado dentro de install.sh, que por sua vez está DENTRO do
+#   tarball da tag. Ou seja: gravar o SHA muda o conteúdo do tarball, o que muda
+#   o próprio SHA. Por isso o valor embutido NUNCA bate 100% com o tarball da
+#   mesma tag, a menos que se re-tague em loop (impossível de fechar).
+#   Efeito prático: `curl …/<tag>/install.sh | bash` pode ABORTAR no passo de
+#   verificação de integridade quando o SHA embutido na tag não corresponde ao
+#   tarball real daquela tag.
+#
+#   Trilha Windows (install.ps1) NÃO é afetada: ela não usa tarball nem checksum.
+#
+#   Soluções recomendadas (escolha uma; fora do escopo deste script):
+#     1) Deixe ENCHA_TARBALL_SHA256 VAZIO no install.sh commitado. A raiz de
+#        confiança passa a ser HTTPS + tag imutável (já documentado no README,
+#        seção "Modelo de confiança"). Publique o SHA real como nota da release
+#        para quem quiser conferir manualmente.
+#     2) Publique checksums.txt como ASSET da GitHub Release (fora da árvore do
+#        repo) e faça o install.sh baixá-lo separadamente — assim o hash não
+#        entra no tarball que ele verifica.
 
 set -euo pipefail
 
