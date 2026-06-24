@@ -83,6 +83,24 @@ confirm() {
   esac
 }
 
+# Prompt sim/não para decisões SEMPRE opcionais (atualizar um app já instalado,
+# voltar ao menu). Diferente de confirm(): IGNORA ASSUME_YES — atualizar/repetir
+# nunca é automático (o usuário pode querer manter a versão antiga). Sem terminal
+# interativo, retorna 1 (Não) sem travar. Default = Não.
+prompt_yes_no() {
+  local prompt="${1:-Continuar?}"
+  if ! tty_available; then
+    return 1
+  fi
+  local reply=""
+  printf '%s%s%s [s/N] ' "$C_BOLD" "$prompt" "$C_RESET" >&2
+  read -r reply </dev/tty || return 1
+  case "$reply" in
+    s|S|sim|SIM|Sim|y|Y|yes|YES|Yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Executa um comando (vetor de argumentos), respeitando DRY_RUN e logando.
 run_cmd() {
   if is_dry_run; then

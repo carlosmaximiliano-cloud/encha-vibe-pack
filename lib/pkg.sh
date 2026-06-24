@@ -82,12 +82,45 @@ persist_fnm_shellenv() {
   done
 }
 
+# Pacote brew JÁ instalado: checa se há versão mais nova e, se houver, oferece
+# atualizar (por app, default Não — o usuário pode querer manter a versão antiga).
+# $1 = flag (--formula | --cask), $2 = nome do pacote.
+# Decide pela SAÍDA de `brew outdated` (não-vazia = há upgrade): robusto a variações
+# de exit code entre versões do brew. Casks com auto_updates não aparecem aqui
+# (sem --greedy) — proposital, evita oferecer upgrade de quem se atualiza sozinho.
+_brew_maybe_upgrade() {
+  local flag="$1" name="$2" out
+  if is_dry_run; then
+    log_success "$name já instalado."
+    return 0
+  fi
+  # IMPORTANTE: `brew outdated <pacote>` sai com código ≠ 0 quando há upgrade
+  # (e imprime o nome no stdout). Sob `set -e`, isso abortaria o módulo — daí o
+  # `|| true`. A decisão é pela SAÍDA (não-vazia = há versão nova), não pelo código.
+  out="$(brew outdated "$flag" "$name" 2>/dev/null || true)"
+  if [ -z "$out" ]; then
+    log_success "$name já instalado (versão mais recente)."
+    return 0
+  fi
+  if prompt_yes_no "$name: versão mais nova disponível. Atualizar?"; then
+    log_info "Atualizando $name via brew…"
+    if brew upgrade "$flag" "$name"; then
+      log_success "$name atualizado."
+    else
+      log_warn "Falha ao atualizar $name — mantido na versão atual."
+    fi
+  else
+    log_success "$name mantido na versão atual."
+  fi
+  return 0
+}
+
 # Instala uma fórmula via brew, se ainda não instalada (idempotente).
 brew_install() {
   local formula="$1"
   has_brew || load_brew_env || { log_error "Homebrew indisponível para instalar $formula"; return 1; }
   if brew list --formula "$formula" >/dev/null 2>&1; then
-    log_success "$formula já instalado."
+    _brew_maybe_upgrade --formula "$formula"
     return 0
   fi
   if is_dry_run; then
@@ -107,7 +140,7 @@ brew_install_cask() {
   fi
   has_brew || load_brew_env || { log_error "Homebrew indisponível para instalar $cask"; return 1; }
   if brew list --cask "$cask" >/dev/null 2>&1; then
-    log_success "$cask já instalado."
+    _brew_maybe_upgrade --cask "$cask"
     return 0
   fi
   if is_dry_run; then

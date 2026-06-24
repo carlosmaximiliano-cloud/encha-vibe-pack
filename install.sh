@@ -19,7 +19,7 @@ set -euo pipefail
 
 # --- Configuração do release (preenchida ao publicar uma tag) ---
 ENCHA_REPO="${ENCHA_REPO:-carlosmaximiliano-cloud/encha-vibe-pack}"
-ENCHA_REF="${ENCHA_REF:-v0.2.7}"                     # tag fixa
+ENCHA_REF="${ENCHA_REF:-v0.2.8}"                     # tag fixa
 # SHA-256 deixado VAZIO de propósito: o checksum é auto-referente (gravá-lo muda o tarball que
 # o contém), então nunca bate com o tarball da própria tag. Raiz de confiança = HTTPS + tag
 # imutável. O SHA real de cada release é publicado nas notas da release para conferência manual.

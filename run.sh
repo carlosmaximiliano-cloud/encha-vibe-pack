@@ -133,51 +133,8 @@ collect() {
     while IFS= read -r m; do [ -n "$m" ] && set_add "$m"; done < <(interactive_select)
   fi
 }
-collect
 
-# Nada selecionado → encerra.
-if [ -z "$(printf '%s' "$SELECTED_SET" | tr -d '[:space:]')" ]; then
-  log_warn "Nenhum item selecionado. Encerrando."
-  exit 0
-fi
-
-# --- Resolução de dependências (idempotentes; sempre seguras de incluir) ---
-# Qualquer instalação exige pré-requisitos + Homebrew.
-set_add "00-prereqs.sh"
-set_add "01-homebrew.sh"
-# Claude Code precisa de Node.
-if set_contains "11-claude-code.sh"; then set_add "10-node-fnm.sh"; fi
-# Starship e plugins do Zsh ficam melhores com o Zsh instalado.
-if set_contains "31-starship.sh" || set_contains "32-zsh-plugins.sh"; then set_add "30-zsh.sh"; fi
-
-# --- Ordena pela ordem do catálogo (respeita dependências por prefixo) ---
-ORDERED=""
-while IFS= read -r m; do
-  [ -n "$m" ] || continue
-  if set_contains "$m"; then ORDERED="${ORDERED}${m}
-"; fi
-done < <(catalog_modules)
-
-# --- Mostra o plano e confirma ---
-PLAN_COUNT=0
-log_step "Plano de instalação:"
-while IFS= read -r m; do
-  [ -n "$m" ] || continue
-  PLAN_COUNT=$((PLAN_COUNT+1))
-  printf '   %s%2d.%s %s\n' "$C_DIM" "$PLAN_COUNT" "$C_RESET" "$(module_title "$m")" >&2
-done < <(printf '%s' "$ORDERED")
-printf '\n' >&2
-
-if ! confirm "Iniciar a instalação destes ${PLAN_COUNT} itens?"; then
-  log_warn "Cancelado pelo usuário."
-  exit 0
-fi
-
-# --- Executa cada módulo isolado em um subprocesso ---
-OK_COUNT=0
-FAIL_COUNT=0
-FAILED_LIST=""
-
+# --- Executa um módulo isolado em um subprocesso (atualiza OK/FAIL globais) ---
 run_module() {
   local mod="$1"
   local path="$ENCHA_ROOT/modules/$mod"
@@ -204,21 +161,83 @@ run_module() {
   esac
 }
 
-while IFS= read -r m; do
-  [ -n "$m" ] || continue
-  run_module "$m"
-done < <(printf '%s' "$ORDERED")
+# Modo "one-shot": com --preset (automação) ou sem terminal, roda uma vez e sai.
+# Caso contrário, ao terminar oferece voltar ao menu principal (como no Windows).
+oneshot_mode() { [ -n "$PRESET" ] || ! tty_available; }
 
-# --- Resumo final ---
-printf '\n' >&2
-log_step "Resumo"
-log_success "Concluídos: $OK_COUNT"
-if [ "$FAIL_COUNT" -gt 0 ]; then
-  log_warn "Com falha: $FAIL_COUNT"
-  printf '%s' "$FAILED_LIST" >&2
-fi
-[ -n "${ENCHA_LOG_FILE:-}" ] && log_info "Log: $ENCHA_LOG_FILE"
-log_info "Dica: feche e reabra o terminal para carregar as novas configurações de shell."
+# --- Laço principal: seleção → plano → execução → resumo, repetível pelo menu ---
+ANY_FAIL=0
+while true; do
+  SELECTED_SET=""
+  collect
 
-if [ "$FAIL_COUNT" -gt 0 ]; then exit 1; fi
+  # Nada selecionado (inclui "0) Cancelar" no menu) → encerra.
+  if [ -z "$(printf '%s' "$SELECTED_SET" | tr -d '[:space:]')" ]; then
+    log_warn "Nenhum item selecionado. Encerrando."
+    break
+  fi
+
+  # --- Resolução de dependências (idempotentes; sempre seguras de incluir) ---
+  # Qualquer instalação exige pré-requisitos + Homebrew.
+  set_add "00-prereqs.sh"
+  set_add "01-homebrew.sh"
+  # Claude Code precisa de Node.
+  if set_contains "11-claude-code.sh"; then set_add "10-node-fnm.sh"; fi
+  # Starship e plugins do Zsh ficam melhores com o Zsh instalado.
+  if set_contains "31-starship.sh" || set_contains "32-zsh-plugins.sh"; then set_add "30-zsh.sh"; fi
+
+  # --- Ordena pela ordem do catálogo (respeita dependências por prefixo) ---
+  ORDERED=""
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    if set_contains "$m"; then ORDERED="${ORDERED}${m}
+"; fi
+  done < <(catalog_modules)
+
+  # --- Mostra o plano e confirma ---
+  PLAN_COUNT=0
+  log_step "Plano de instalação:"
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    PLAN_COUNT=$((PLAN_COUNT+1))
+    printf '   %s%2d.%s %s\n' "$C_DIM" "$PLAN_COUNT" "$C_RESET" "$(module_title "$m")" >&2
+  done < <(printf '%s' "$ORDERED")
+  printf '\n' >&2
+
+  if ! confirm "Iniciar a instalação destes ${PLAN_COUNT} itens?"; then
+    log_warn "Cancelado."
+    # Interativo: volta ao menu para reselecionar. Automação: encerra.
+    if oneshot_mode; then break; fi
+    continue
+  fi
+
+  # --- Executa cada módulo isolado ---
+  OK_COUNT=0
+  FAIL_COUNT=0
+  FAILED_LIST=""
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    run_module "$m"
+  done < <(printf '%s' "$ORDERED")
+
+  # --- Resumo ---
+  printf '\n' >&2
+  log_step "Resumo"
+  log_success "Concluídos: $OK_COUNT"
+  if [ "$FAIL_COUNT" -gt 0 ]; then
+    log_warn "Com falha: $FAIL_COUNT"
+    printf '%s' "$FAILED_LIST" >&2
+    ANY_FAIL=1
+  fi
+  [ -n "${ENCHA_LOG_FILE:-}" ] && log_info "Log: $ENCHA_LOG_FILE"
+  log_info "Dica: feche e reabra o terminal para carregar as novas configurações de shell."
+
+  # --- Voltar ao menu? (só interativo; automação roda uma vez e sai) ---
+  if oneshot_mode; then break; fi
+  printf '\n' >&2
+  prompt_yes_no "Voltar ao menu principal?" || break
+  printf '\n' >&2
+done
+
+if [ "$ANY_FAIL" -gt 0 ]; then exit 1; fi
 exit 0
