@@ -54,7 +54,7 @@ $env:WSL_UTF8 = '1'
 
 # --- Configuração do release (mesma do install.sh) ---
 $Repo = $env:ENCHA_REPO; if (-not $Repo) { $Repo = 'carlosmaximiliano-cloud/encha-vibe-pack' }
-$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.4' }
+$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.6' }
 $Url  = "https://raw.githubusercontent.com/$Repo/$Ref/install.sh"
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
 
@@ -64,20 +64,31 @@ function Write-Ok($msg)      { Write-Host "[ok] $msg"  -ForegroundColor Green }
 function Write-WarnMsg($msg) { Write-Host "[!] $msg"   -ForegroundColor Yellow }
 function Write-ErrMsg($msg)  { Write-Host "[x] $msg"   -ForegroundColor Red }
 
+# --- Encerramento seguro ---
+# 'exit' encerra o HOST atual: rodado in-process (one-liner do README via scriptblock),
+# fecharia a janela do usuário. Em vez disso, registramos o código e lançamos um sentinela
+# que é capturado no try/catch de nível superior; só chamamos 'exit' de verdade quando NÃO
+# há console interativo (CI/pipe), preservando o exit code para automação.
+$script:EnchaExitCode = 0
+function Stop-Encha([int]$code = 0) {
+  $script:EnchaExitCode = $code
+  throw 'ENCHA_STOP'
+}
+
 # --- Validação de entradas (defesa em profundidade; valores podem vir de env) ---
 function Assert-Inputs {
   if ($Repo -notmatch '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') {
-    Write-ErrMsg "ENCHA_REPO inválido: '$Repo' (esperado: owner/repo)."; exit 1
+    Write-ErrMsg "ENCHA_REPO inválido: '$Repo' (esperado: owner/repo)."; Stop-Encha 1
   }
   if ($Ref -notmatch '^[A-Za-z0-9._-]+$') {
-    Write-ErrMsg "ENCHA_REF inválido: '$Ref'."; exit 1
+    Write-ErrMsg "ENCHA_REF inválido: '$Ref'."; Stop-Encha 1
   }
   if ($Distro -notmatch '^[A-Za-z0-9 ._-]+$') {
-    Write-ErrMsg "Distro inválida: '$Distro'."; exit 1
+    Write-ErrMsg "Distro inválida: '$Distro'."; Stop-Encha 1
   }
   if (($Ref -in @('main','master','HEAD','develop','dev','latest')) -and (-not $AllowUnverified)) {
     Write-ErrMsg "ENCHA_REF aponta para uma branch ('$Ref'). Use uma tag (ex.: v0.1.0) ou passe -AllowUnverified."
-    exit 1
+    Stop-Encha 1
   }
 }
 
@@ -125,13 +136,13 @@ function Confirm-Risk {
     Write-ErrMsg 'Sem terminal interativo para confirmar o aviso.'
     Write-Host   'Rode de novo aceitando os termos, ex.: .\install.ps1 -AcceptRisk -Preset rapido' -ForegroundColor White
     Write-Host   '(ou defina $env:ENCHA_ACCEPT_RISK=1).' -ForegroundColor White
-    exit 1
+    Stop-Encha 1
   }
   $ans = Read-Host 'Voce concorda em prosseguir, por sua conta e risco? [s/N]'
   if ($ans -notmatch '^(s|sim|y|yes)$') {
     Write-ErrMsg 'E preciso aceitar os termos para continuar.'
     Write-Host   'Para automatizar, defina $env:ENCHA_ACCEPT_RISK=1 ou passe -AcceptRisk.' -ForegroundColor White
-    exit 1
+    Stop-Encha 1
   }
 }
 
@@ -288,7 +299,7 @@ function Invoke-MapEntry($entry, $activeTier) {
 function Get-PresetModules($preset) {
   $u = "https://raw.githubusercontent.com/$Repo/$Ref/presets/$preset.txt"
   try { $raw = Invoke-RestMethod -Uri $u } catch {
-    Write-ErrMsg "Não consegui baixar o preset '$preset' ($u)."; exit 1
+    Write-ErrMsg "Não consegui baixar o preset '$preset' ($u)."; Stop-Encha 1
   }
   return ($raw -split "`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -and ($_ -notlike '#*') }
 }
@@ -336,19 +347,19 @@ function Resolve-Selection {
     '2' { return @{ Tier='recomendado'; Modules=(Get-PresetModules 'recomendado') } }
     '3' { return @{ Tier='completo';    Modules=(Get-PresetModules 'completo') } }
     '4' { return (Select-Custom) }
-    '0' { Write-Host 'Cancelado.'; exit 0 }
-    default { Write-WarnMsg "Opção inválida: $c"; exit 1 }
+    '0' { Write-Host 'Cancelado.'; Stop-Encha 0 }
+    default { Write-WarnMsg "Opção inválida: $c"; Stop-Encha 1 }
   }
 }
 
 # Orquestra a instalação nativa.
 function Invoke-NativeInstall {
   Confirm-Risk
-  if (-not (Test-Winget)) { exit 1 }
+  if (-not (Test-Winget)) { Stop-Encha 1 }
 
   $sel = Resolve-Selection
   $modules = @($sel.Modules)
-  if ($modules.Count -eq 0) { Write-WarnMsg 'Nada selecionado. Encerrando.'; exit 0 }
+  if ($modules.Count -eq 0) { Write-WarnMsg 'Nada selecionado. Encerrando.'; Stop-Encha 0 }
 
   $okN = 0; $failN = 0; $skipN = 0; $failed = @()
   foreach ($entry in (Get-WingetMap)) {
@@ -371,7 +382,7 @@ function Invoke-NativeInstall {
   }
   Write-Host ''
   Write-Ok 'Pronto! Abra um PowerShell NOVO e rode: claude'
-  if ($failN -gt 0) { exit 1 } else { exit 0 }
+  if ($failN -gt 0) { Stop-Encha 1 } else { Stop-Encha 0 }
 }
 
 # ============================ TRILHA WSL (avançado) ============================
@@ -384,7 +395,7 @@ function Invoke-Elevation {
     Write-Host   'Feche este PowerShell e reabra-o COMO ADMINISTRADOR' -ForegroundColor White
     Write-Host   '(menu Iniciar > digite "PowerShell" > botão direito > "Executar como administrador"),' -ForegroundColor White
     Write-Host   'e rode A MESMA linha de comando novamente.' -ForegroundColor White
-    exit 1
+    Stop-Encha 1
   }
   Write-WarnMsg 'Este passo precisa de privilégios de administrador. Solicitando elevação...'
   $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Mode', 'wsl', '-Distro', $Distro)
@@ -395,9 +406,9 @@ function Invoke-Elevation {
   try {
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argList
   } catch {
-    Write-ErrMsg "Não foi possível elevar: $($_.Exception.Message)"; exit 1
+    Write-ErrMsg "Não foi possível elevar: $($_.Exception.Message)"; Stop-Encha 1
   }
-  exit 0
+  Stop-Encha 0
 }
 
 function Test-WslPresent { return [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue) }
@@ -502,7 +513,7 @@ function Invoke-WslInstall {
   Confirm-Risk -Wsl
   if (-not (Step-InstallWsl)) {
     Write-WarnMsg 'Etapa do WSL ainda não concluída. Reinicie/abra o Ubuntu conforme indicado e rode novamente.'
-    exit 1
+    Stop-Encha 1
   }
   if (-not (Test-NonRootUser)) {
     Write-WarnMsg "Não consegui rodar comandos no '$Distro' como usuário comum."
@@ -510,26 +521,36 @@ function Invoke-WslInstall {
     Write-Host    "  - Se você acabou de instalar o WSL, talvez precise REINICIAR o Windows." -ForegroundColor White
     Write-Host    "  - Abra o app '$Distro' uma vez e crie seu usuário e senha do Linux." -ForegroundColor White
     Write-Host    '  Depois, rode esta mesma linha de comando novamente.' -ForegroundColor White
-    exit 1
+    Stop-Encha 1
   }
   if (Step-RunInstaller) {
     Write-Host ''
     Write-Ok "Tudo pronto! Abra o '$Distro' (ou o Windows Terminal) e comece com: claude"
-    exit 0
+    Stop-Encha 0
   } else {
-    exit 1
+    Stop-Encha 1
   }
 }
 
 # ----------------------------- Fluxo principal -----------------------------
-Assert-Inputs
+try {
+  Assert-Inputs
 
-Write-Host ''
-Write-Host '  Encha Vibe Pack - instalador para Windows' -ForegroundColor Cyan
-Write-Host "  repo: $Repo  -  ref: $Ref  -  modo: $Mode" -ForegroundColor DarkGray
+  Write-Host ''
+  Write-Host '  Encha Vibe Pack - instalador para Windows' -ForegroundColor Cyan
+  Write-Host "  repo: $Repo  -  ref: $Ref  -  modo: $Mode" -ForegroundColor DarkGray
 
-if ($Mode -eq 'wsl') {
-  Invoke-WslInstall
-} else {
-  Invoke-NativeInstall
+  if ($Mode -eq 'wsl') {
+    Invoke-WslInstall
+  } else {
+    Invoke-NativeInstall
+  }
+} catch {
+  if ($_.Exception.Message -ne 'ENCHA_STOP') {
+    Write-ErrMsg "Erro inesperado: $($_.Exception.Message)"
+    $script:EnchaExitCode = 1
+  }
 }
+# Em CI/pipe (sem console interativo) propaga o código de saída; em sessão interativa
+# NÃO chamamos 'exit' — isso fecharia a janela do usuário quando rodado in-process.
+if (-not (Test-Interactive)) { exit $script:EnchaExitCode }

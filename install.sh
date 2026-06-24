@@ -10,16 +10,20 @@
 #   2) Caso contrário, baixa o tarball da TAG fixa, verifica o SHA-256, extrai em
 #      ~/.encha-vibe-pack/<tag> e executa run.sh.
 #
-# Segurança: a tag é fixa (nunca "main"); se o checksum estiver embutido, ele é
-# obrigatório. Sem checksum (build de desenvolvimento), pede confirmação antes
-# de prosseguir — a menos que ENCHA_ALLOW_UNVERIFIED=1.
+# Segurança: a tag é fixa (nunca "main"; branches só com ENCHA_ALLOW_UNVERIFIED=1). A raiz
+# de confiança é HTTPS + tag imutável. Se ENCHA_TARBALL_SHA256 estiver preenchido, o tarball
+# é conferido por SHA-256; se estiver vazio (padrão — o checksum é auto-referente), a etapa
+# é pulada e o SHA real é publicado nas notas da release para conferência manual.
 
 set -euo pipefail
 
 # --- Configuração do release (preenchida ao publicar uma tag) ---
 ENCHA_REPO="${ENCHA_REPO:-carlosmaximiliano-cloud/encha-vibe-pack}"
-ENCHA_REF="${ENCHA_REF:-v0.2.4}"                     # tag fixa
-ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-c4564a5b0e371957682e8e2b0497902a62d77e912d8e3a2e95ed35d56ec8090d}"     # SHA-256 do tarball (v0.2.4)
+ENCHA_REF="${ENCHA_REF:-v0.2.6}"                     # tag fixa
+# SHA-256 deixado VAZIO de propósito: o checksum é auto-referente (gravá-lo muda o tarball que
+# o contém), então nunca bate com o tarball da própria tag. Raiz de confiança = HTTPS + tag
+# imutável. O SHA real de cada release é publicado nas notas da release para conferência manual.
+ENCHA_TARBALL_SHA256="${ENCHA_TARBALL_SHA256:-}"
 ENCHA_HOME="${ENCHA_HOME:-$HOME/.encha-vibe-pack}"
 
 say() { printf '%s\n' "$*" >&2; }

@@ -17,7 +17,7 @@ por um **tier pronto** (rápido) ou marcando **item a item**.
 ### macOS / Linux / WSL2
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.sh | bash
 ```
 
 ### Windows (nativo — recomendado)
@@ -25,14 +25,18 @@ curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-
 Abra o **PowerShell** e rode:
 
 ```powershell
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.ps1 | iex
+$f = "$env:TEMP\encha-install.ps1"
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+powershell -NoProfile -ExecutionPolicy Bypass -File $f
 ```
 
 O instalador exibe um aviso, pede confirmação e abre um menu de tiers — tudo interativo.
 Ao terminar, abra um PowerShell **novo** e use `claude`.
 
-> **Por que não `irm | iex`?** Scripts com bloco `param()` falham com `| iex` no PowerShell.
-> O `& ([scriptblock]::Create(...))` é o equivalente correto.
+> **Por que baixar para um arquivo e rodar com `-File`?** Scripts com bloco `param()` falham
+> com `irm | iex`. E rodar o script **no mesmo processo** (`irm | iex` ou
+> `& ([scriptblock]::Create(...))`) faz qualquer `exit` interno **fechar a sua janela**.
+> Rodar com `-File` num processo separado evita os dois problemas: a janela nunca fecha.
 
 > Instala o **Claude Code nativo** (sem WSL, sem Node, com auto-atualização) e as demais
 > ferramentas via **winget**, e ajusta o perfil do PowerShell.
@@ -45,11 +49,14 @@ Ao terminar, abra um PowerShell **novo** e use `claude`.
 Para rodar **sem menus** (aceita os termos e escolhe o tier automaticamente):
 
 ```powershell
+$f = "$env:TEMP\encha-install.ps1"
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+
 # Tier "rápido" — só o Claude Code + ferramentas de busca
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.0/install.ps1))) -AcceptRisk -Preset rapido
+powershell -NoProfile -ExecutionPolicy Bypass -File $f -AcceptRisk -Preset rapido
 
 # Tier "recomendado" — essencial + shell, git/IDE
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.0/install.ps1))) -AcceptRisk -Preset recomendado
+powershell -NoProfile -ExecutionPolicy Bypass -File $f -AcceptRisk -Preset recomendado
 ```
 
 > `-AcceptRisk` aceita o aviso de isenção de responsabilidade sem digitar `s`.
@@ -62,7 +69,9 @@ Para quem quer um ambiente **Linux completo** (ex.: sandbox), abra o **PowerShel
 Administrador** e rode:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.ps1))) -Mode wsl
+$f = "$env:TEMP\encha-install.ps1"
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+powershell -NoProfile -ExecutionPolicy Bypass -File $f -Mode wsl
 ```
 
 Esse modo habilita o WSL2, instala o Ubuntu e roda o instalador lá dentro. Pode pedir um
@@ -130,13 +139,15 @@ Levamos a sério rodar coisas na máquina do aluno:
 
 - **Baixe e inspecione antes de rodar** (recomendado). Em vez do `| bash`, baixe e leia:
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.4/install.sh -o install.sh
+  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.sh -o install.sh
   less install.sh        # leia
   bash install.sh        # rode
   ```
-- **Tag fixa, não `main`.** O bootstrap baixa sempre uma versão _tagueada_ e imutável.
-- **Verificação de integridade.** O tarball é conferido por **SHA-256** antes de rodar.
-  Downloads de binários usam **somente HTTPS** (`lib/security.sh`).
+- **Tag fixa, não `main`.** O bootstrap baixa sempre uma versão _tagueada_ e imutável —
+  esta é a raiz de confiança (HTTPS + tag imutável).
+- **Verificação de integridade (opcional).** O SHA-256 de cada release é publicado nas
+  notas da release para conferência manual. Downloads de binários usam **somente HTTPS**
+  (`lib/security.sh`).
 - **`sudo` transparente.** Só pedimos administrador quando necessário e **mostramos o comando** antes de executá-lo.
 - **Idempotente.** Rodar de novo não quebra nada: o que já existe é detectado e pulado.
 - **Sem telemetria.** Nada é enviado para lugar nenhum. Logs ficam só na sua máquina, em `~/.encha-vibe-pack/logs/`.

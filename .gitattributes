@@ -1,0 +1,2 @@
+# Scripts shell precisam de LF (senão o shebang quebra em macOS/Linux).
+*.sh text eol=lf
