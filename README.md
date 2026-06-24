@@ -17,7 +17,7 @@ por um **tier pronto** (rápido) ou marcando **item a item**.
 ### macOS / Linux / WSL2
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.7/install.sh | bash
 ```
 
 ### Windows (nativo — recomendado)
@@ -26,7 +26,7 @@ Abra o **PowerShell** e rode:
 
 ```powershell
 $f = "$env:TEMP\encha-install.ps1"
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.7/install.ps1 -OutFile $f
 powershell -NoProfile -ExecutionPolicy Bypass -File $f
 ```
 
@@ -50,7 +50,7 @@ Para rodar **sem menus** (aceita os termos e escolhe o tier automaticamente):
 
 ```powershell
 $f = "$env:TEMP\encha-install.ps1"
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.7/install.ps1 -OutFile $f
 
 # Tier "rápido" — só o Claude Code + ferramentas de busca
 powershell -NoProfile -ExecutionPolicy Bypass -File $f -AcceptRisk -Preset rapido
@@ -70,7 +70,7 @@ Administrador** e rode:
 
 ```powershell
 $f = "$env:TEMP\encha-install.ps1"
-irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.ps1 -OutFile $f
+irm https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.7/install.ps1 -OutFile $f
 powershell -NoProfile -ExecutionPolicy Bypass -File $f -Mode wsl
 ```
 
@@ -139,7 +139,7 @@ Levamos a sério rodar coisas na máquina do aluno:
 
 - **Baixe e inspecione antes de rodar** (recomendado). Em vez do `| bash`, baixe e leia:
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.6/install.sh -o install.sh
+  curl -fsSL https://raw.githubusercontent.com/carlosmaximiliano-cloud/encha-vibe-pack/v0.2.7/install.sh -o install.sh
   less install.sh        # leia
   bash install.sh        # rode
   ```

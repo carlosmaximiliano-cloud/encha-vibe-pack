@@ -54,7 +54,7 @@ $env:WSL_UTF8 = '1'
 
 # --- Configuração do release (mesma do install.sh) ---
 $Repo = $env:ENCHA_REPO; if (-not $Repo) { $Repo = 'carlosmaximiliano-cloud/encha-vibe-pack' }
-$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.6' }
+$Ref  = $env:ENCHA_REF;  if (-not $Ref)  { $Ref  = 'v0.2.7' }
 $Url  = "https://raw.githubusercontent.com/$Repo/$Ref/install.sh"
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
 
@@ -198,19 +198,52 @@ function Test-WingetInstalled($id) {
   return ($LASTEXITCODE -eq 0)
 }
 
+# Retorna a versão disponível para upgrade de um pacote já instalado, ou $null se já é a mais recente.
+# Faz parsing da tabela do 'winget list': Name  Id  Version  Available  Source (5 colunas = upgrade existe).
+# Se o parsing falhar (saída inesperada), retorna $null sem causar regressão.
+function Get-WingetAvailableVersion($id) {
+  $lines = & winget list --id $id -e --accept-source-agreements 2>&1
+  foreach ($line in $lines) {
+    if ($line -match [regex]::Escape($id)) {
+      $parts = ($line -split '\s{2,}') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+      if ($parts.Count -ge 5) { return $parts[3] }
+    }
+  }
+  return $null
+}
+
 # Instala um pacote winget. Tenta --scope user; cai para sem escopo se necessário.
+# Se já instalado e houver upgrade, pergunta antes de atualizar (sempre, mesmo com -AcceptRisk).
 function Install-WingetId($id, $label) {
-  if (Test-WingetInstalled $id) { Write-Ok "$label já instalado."; return $true }
+  if (Test-WingetInstalled $id) {
+    $avail = Get-WingetAvailableVersion $id
+    if ($avail) {
+      if (Test-Interactive) {
+        $ans = Read-Host "$label — versao $avail disponivel. Deseja atualizar? [s/N]"
+        if ($ans -match '^(s|sim|y|yes)$') {
+          Write-Step "Atualizando $label..."
+          & winget upgrade --id $id -e --silent --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -in @(0, -1978335212, -1978335189)) { Write-Ok "$label atualizado."; return $true }
+          Write-WarnMsg "Falha ao atualizar $label (codigo $LASTEXITCODE)."
+          return $false
+        }
+      } else {
+        Write-WarnMsg "$label tem versao nova ($avail) disponivel. Use 'winget upgrade --id $id' para atualizar."
+      }
+    }
+    Write-Ok "$label ja instalado."
+    return $true
+  }
   Write-Step "Instalando $label ($id)..."
   & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements --scope user
   if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
   # -1978335189 = PACKAGE_ALREADY_INSTALLED; -1978335212 = NO_APPLICABLE_UPDATE (já na versão mais recente)
-  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label já instalado."; return $true }
+  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label ja instalado."; return $true }
   # Alguns pacotes só têm escopo de máquina — tenta sem --scope (pode pedir UAC).
   & winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements
   if ($LASTEXITCODE -eq 0) { Write-Ok "$label instalado."; return $true }
-  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label já instalado."; return $true }
-  Write-WarnMsg "Falha ao instalar $label (winget código $LASTEXITCODE)."
+  if ($LASTEXITCODE -in @(-1978335189, -1978335212)) { Write-Ok "$label ja instalado."; return $true }
+  Write-WarnMsg "Falha ao instalar $label (winget codigo $LASTEXITCODE)."
   return $false
 }
 
@@ -347,7 +380,7 @@ function Resolve-Selection {
     '2' { return @{ Tier='recomendado'; Modules=(Get-PresetModules 'recomendado') } }
     '3' { return @{ Tier='completo';    Modules=(Get-PresetModules 'completo') } }
     '4' { return (Select-Custom) }
-    '0' { Write-Host 'Cancelado.'; Stop-Encha 0 }
+    '0' { Write-Host 'Cancelado.'; return @{ Cancel=$true } }
     default { Write-WarnMsg "Opção inválida: $c"; Stop-Encha 1 }
   }
 }
@@ -357,32 +390,44 @@ function Invoke-NativeInstall {
   Confirm-Risk
   if (-not (Test-Winget)) { Stop-Encha 1 }
 
-  $sel = Resolve-Selection
-  $modules = @($sel.Modules)
-  if ($modules.Count -eq 0) { Write-WarnMsg 'Nada selecionado. Encerrando.'; Stop-Encha 0 }
+  $anyFail = $false
+  do {
+    $sel = Resolve-Selection
+    if ($sel.Cancel) { break }
 
-  $okN = 0; $failN = 0; $skipN = 0; $failed = @()
-  foreach ($entry in (Get-WingetMap)) {
-    if ($modules -contains $entry.Module) {
-      switch (Invoke-MapEntry $entry $sel.Tier) {
-        'ok'   { $okN++ }
-        'fail' { $failN++; $failed += $entry.Label }
-        'skip' { $skipN++ }
+    $modules = @($sel.Modules)
+    if ($modules.Count -eq 0) { Write-WarnMsg 'Nada selecionado.'; break }
+
+    $okN = 0; $failN = 0; $skipN = 0; $failed = @()
+    foreach ($entry in (Get-WingetMap)) {
+      if ($modules -contains $entry.Module) {
+        switch (Invoke-MapEntry $entry $sel.Tier) {
+          'ok'   { $okN++ }
+          'fail' { $failN++; $failed += $entry.Label }
+          'skip' { $skipN++ }
+        }
       }
     }
-  }
+    if ($failN -gt 0) { $anyFail = $true }
 
-  Write-Host ''
-  Write-Step 'Resumo'
-  Write-Ok "Concluidos: $okN"
-  if ($skipN -gt 0) { Write-Host "  Pulados: $skipN" -ForegroundColor DarkGray }
-  if ($failN -gt 0) {
-    Write-WarnMsg "Com falha: $failN"
-    $failed | ForEach-Object { Write-Host "   - $_" -ForegroundColor Yellow }
-  }
-  Write-Host ''
-  Write-Ok 'Pronto! Abra um PowerShell NOVO e rode: claude'
-  if ($failN -gt 0) { Stop-Encha 1 } else { Stop-Encha 0 }
+    Write-Host ''
+    Write-Step 'Resumo'
+    Write-Ok "Concluidos: $okN"
+    if ($skipN -gt 0) { Write-Host "  Pulados: $skipN" -ForegroundColor DarkGray }
+    if ($failN -gt 0) {
+      Write-WarnMsg "Com falha: $failN"
+      $failed | ForEach-Object { Write-Host "   - $_" -ForegroundColor Yellow }
+    }
+    Write-Host ''
+    Write-Ok 'Pronto! Abra um PowerShell NOVO e rode: claude'
+
+    if (-not (Test-Interactive)) { break }
+    $again = Read-Host 'Voltar ao menu principal? [s/N]'
+    if ($again -notmatch '^(s|sim|y|yes)$') { break }
+    Write-Host ''
+  } while ($true)
+
+  if ($anyFail) { Stop-Encha 1 } else { Stop-Encha 0 }
 }
 
 # ============================ TRILHA WSL (avançado) ============================
